@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/"
+      }
+    }
+  </script>
+  <title>3D Audio Spectrogram Visualiser with 3-Axis Labels</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #000;
+      overflow: hidden;
+    }
+    #startButton {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 15px 30px;
+      font-size: 18px;
+      color: #000000;
+      background-color: rgb(255, 255, 255);
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <button id="startButton">Start</button>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    
+    // Shift camera slightly right and up for a better perspective of the 3-axis corner
+    camera.position.set(45, 55, 95);
+    camera.lookAt(0, 0, 0);
+
+    // Audio Setup
+    let audioContext, analyser, dataArray, bufferLength;
+    let isRecording = false;
+
+    // Spectrogram Setup
+    const timeSamples = 128; // Depth (Time history)
+    const freqSamples = 128; // Width (Frequency bins mapped to plane)
+    const width = 100;
+    const depth = 100;
+
+    let labelSprites = [];
+
+    // Create a DataTexture to hold frequency data over time
+    const size = timeSamples * freqSamples;
+    const audioData = new Uint8Array(4 * size);
+    const dataTexture = new THREE.DataTexture(audioData, freqSamples, timeSamples, THREE.RGBAFormat);
+    dataTexture.needsUpdate = true;
+
+    // GLSL Shaders
+    const vertexShader = `
+      uniform sampler2D u_audioTexture;
+      varying float vElevation;
+
+      void main() {
+        vec4 texData = texture2D(u_audioTexture, uv);
+        float elevation = texData.r * 25.0; 
+        vElevation = elevation;
+
+        vec3 newPosition = position;
+        newPosition.y += elevation;
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+      }
+    `;
+
+    const fragmentShader = `
+      varying float vElevation;
+
+      void main() {
+        // Clamp intensity between 0.0 and 1.0 based on the maximum elevation (25.0)
+        float intensity = clamp(vElevation / 25.0, 0.0, 1.0);
+        
+        // Red channel starts ramping up early (fully red by 70% elevation)
+        float r = smoothstep(0.0, 0.7, intensity);
+        
+        // Green channel stays strong, then fades out at high elevation
+        float g = 1.0 - smoothstep(0.3, 1.0, intensity);
+        
+        float b = 0.0;
+        
+        vec3 colour = vec3(r, g, b);
+        gl_FragColor = vec4(colour, 1.0);
+      }
+    `;
+
+    // Create the Plane Geometry and Shader Material
+    const geometry = new THREE.PlaneGeometry(width, depth, freqSamples - 1, timeSamples - 1);
+    geometry.rotateX(-Math.PI / 2); // Lay it flat
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        u_audioTexture: { value: dataTexture }
+      },
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      wireframe: true
+    });
+
+    const spectrogramMesh = new THREE.Mesh(geometry, material);
+    scene.add(spectrogramMesh);
+
+    // Helper to generate a line in 3D space
+    function createAxisLine(start, end, colour = 0xffffff) {
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(...start),
+        new THREE.Vector3(...end)
+      ]);
+      const lineMaterial = new THREE.LineBasicMaterial({ color: colour });
+      const line = new THREE.Line(lineGeometry, lineMaterial);
+      scene.add(line);
+      return line;
+    }
+
+    // Draw the structural 3D axis lines intersecting at the front-left corner
+    createAxisLine([-width / 2, 0.1, depth / 2], [width / 2, 0.1, depth / 2]);      // X-Axis (Frequency)
+    createAxisLine([-width / 2, 0, depth / 2], [-width / 2, 25, depth / 2]);       // Y-Axis (Decibels)
+    createAxisLine([-width / 2, 0.1, depth / 2], [-width / 2, 0.1, -depth / 2]);   // Z-Axis (Time History)
+
+    const startButton = document.getElementById('startButton');
+    startButton.addEventListener('click', () => {
+      if (!isRecording) {
+        startButton.textContent = 'Stop';
+        startAudio();
+      } else {
+        startButton.textContent = 'Start';
+        stopAudio();
+      }
+      isRecording = !isRecording;
+    });
+
+    // Generate dynamic label sprites using Canvas 2D
+    function createLabelSprite(text, x, y, z) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = 'Bold 16px Arial';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(spriteMaterial);
+      
+      sprite.position.set(x, y, z);
+      sprite.scale.set(10, 2.5, 1);
+      return sprite;
+    }
+
+    function generateAllAxisLabels() {
+      // Clear existing sprites
+      labelSprites.forEach(sprite => scene.remove(sprite));
+      labelSprites = [];
+
+      // 1. X-AXIS LABELS (Frequency)
+      const hzPerBin = audioContext.sampleRate / analyser.fftSize;
+      const numXLabels = 5;
+      for (let i = 0; i < numXLabels; i++) {
+        const binIndex = Math.round((i / (numXLabels - 1)) * (freqSamples - 1));
+        const freq = binIndex * hzPerBin;
+        const labelText = freq < 1000 ? `${Math.round(freq)} Hz` : `${(freq / 1000).toFixed(1)} kHz`;
+        
+        const x = -width / 2 + (i / (numXLabels - 1)) * width;
+        const sprite = createLabelSprite(labelText, x, 1.5, depth / 2 + 5);
+        scene.add(sprite);
+        labelSprites.push(sprite);
+      }
+
+      // 2. Y-AXIS LABELS (Decibels)
+      const minDb = analyser.minDecibels; // Usually -100 dB
+      const maxDb = analyser.maxDecibels; // Usually -30 dB
+      const dbRange = maxDb - minDb;
+      const numYLabels = 5;
+      for (let i = 0; i < numYLabels; i++) {
+        const fraction = i / (numYLabels - 1);
+        const dbVal = minDb + fraction * dbRange;
+        const y = fraction * 25; // Scale offset matching the shader elevation limit (25)
+        const labelText = `${Math.round(dbVal)} dB`;
+        
+        // Offset labels to the left of the grid
+        const sprite = createLabelSprite(labelText, -width / 2 - 8, y, depth / 2 + 1);
+        scene.add(sprite);
+        labelSprites.push(sprite);
+      }
+
+      // 3. Z-AXIS LABELS (Time History Offset)
+      // Assumes roughly 16.67ms per frame (60 FPS default)
+      const totalSeconds = (timeSamples * 16.67) / 1000;
+      const numZLabels = 5;
+      for (let i = 0; i < numZLabels; i++) {
+        const fraction = i / (numZLabels - 1);
+        const secondsAgo = fraction * totalSeconds;
+        const z = depth / 2 - fraction * depth; // Progresses from front edge (Now) to back edge (Past)
+        const labelText = secondsAgo === 0 ? 'Now' : `-${secondsAgo.toFixed(1)}s`;
+        
+        // Offset labels to the left edge of the grid
+        const sprite = createLabelSprite(labelText, -width / 2 - 8, 1.5, z);
+        scene.add(sprite);
+        labelSprites.push(sprite);
+      }
+    }
+
+    function startAudio() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        
+        analyser.fftSize = 1024; 
+        bufferLength = analyser.frequencyBinCount; 
+        dataArray = new Uint8Array(bufferLength);
+
+        const mediaStream = navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStream.then(stream => {
+          const source = audioContext.createMediaStreamSource(stream);
+          source.connect(analyser);
+          
+          generateAllAxisLabels();
+          animate();
+        }).catch(err => {
+          console.error('Microphone access denied:', err);
+        });
+      } else {
+        audioContext.resume();
+      }
+    }
+
+    function stopAudio() {
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      controls.update();
+
+      if (isRecording && analyser) {
+        analyser.getByteFrequencyData(dataArray);
+
+        // Shift the old data down in the texture
+        for (let i = timeSamples - 1; i > 0; i--) {
+          const rowOffset = i * freqSamples * 4;
+          const prevRowOffset = (i - 1) * freqSamples * 4;
+          for (let j = 0; j < freqSamples * 4; j++) {
+            audioData[rowOffset + j] = audioData[prevRowOffset + j];
+          }
+        }
+
+        // Copy new cropped frequency bin data into row 0
+        for (let i = 0; i < freqSamples; i++) {
+          const val = dataArray[i]; 
+          const index = i * 4;
+          audioData[index] = val;     // R
+          audioData[index + 1] = val; // G
+          audioData[index + 2] = val; // B
+          audioData[index + 3] = 255; // A
+        }
+        
+        dataTexture.needsUpdate = true;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
