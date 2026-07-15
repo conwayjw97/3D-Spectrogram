@@ -358,8 +358,7 @@
       if (isRecording && analyser) {
         analyser.getByteFrequencyData(dataArray);
 
-        // Map the frequency range [0, 10kHz] onto the grid's 128 physical samples (downsampling/resampling)
-        const targetFrequency = 10000; // 10 kHz
+        // Removed "const targetFrequency = 10000;" so it uses the dynamic global slider value
         const maxIndex = Math.floor((targetFrequency / audioContext.sampleRate) * analyser.fftSize);
 
         // Shift the old data down in the texture
@@ -377,7 +376,7 @@
         }
 
         // Copy resampled frequency bin data into row 0
-        let sumAmplitude = 0;
+        let peakAmplitude = 0; // Keep track of peak amplitude instead of sum 
         const linePositions = frontLineGeometry.attributes.position.array;
         for (let i = 0; i < freqSamples; i++) {
           // Linearly interpolate/map index mapping from [0, freqSamples] to [0, maxIndex]
@@ -386,7 +385,10 @@
             dataArray.length - 1
           );
           const val = dataArray[mappedIndex]; 
-          sumAmplitude += val;
+          // Track the highest amplitude value in the current spectrum
+          if (val > peakAmplitude) {
+            peakAmplitude = val;
+          }
           
           const index = i * 4;
           audioData[index] = val;     // R
@@ -399,9 +401,8 @@
           linePositions[i * 3 + 1] = yVal;
         }
 
-        // Calculate & map the average DB / Amplitude for the newest row 
-        const averageAmplitude = sumAmplitude / freqSamples;
-        historyAmplitudes[0] = (averageAmplitude / 255.0) * 25.0;
+        // Map peak amplitude to the side line history 
+        historyAmplitudes[0] = (peakAmplitude / 255.0) * 25.0;
 
         // Update the Z-axis side-line geometry positions based on history 
         const sidePositions = sideLineGeometry.attributes.position.array;
