@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { vertexShader, fragmentShader } from './shaders.js';
+import { vertexShader, fragmentShader, wireFragmentShader } from './shaders.js';
 import { audioState } from './audio.js';
 import { initUI } from './ui.js';
 
@@ -48,7 +48,7 @@ scene.add(solidMesh);
 const wireframeMesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
   uniforms: { u_audioTexture: { value: dataTexture } },
   vertexShader, 
-  fragmentShader: `void main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 0.6); }`,
+  fragmentShader: wireFragmentShader,
   wireframe: true, side: THREE.DoubleSide, transparent: true
 }));
 scene.add(wireframeMesh);

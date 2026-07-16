@@ -37,3 +37,9 @@ export const fragmentShader = `
     gl_FragColor = vec4(colour, 1.0);
   }
 `;
+
+export const wireFragmentShader = `
+    void main() { 
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.6); 
+    }
+`;
