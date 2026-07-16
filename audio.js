@@ -3,7 +3,9 @@ export const audioState = {
   analyser: null,
   dataArray: null,
   isRecording: false,
-  targetFrequency: 10000
+  minFrequency: 0,        // Tracking parameter for low end frequency cutoff
+  targetFrequency: 10000, // Tracking parameter for high end frequency cutoff
+  timeWindow: 2.0         // Initialised at 2.0 seconds
 };
 
 export function startAudio(onSuccess) {

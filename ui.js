@@ -5,7 +5,6 @@ let labelSprites = [];
 let currentScene = null;
 let uiConfig = {};
 
-// Helper to dynamically generate a text sprite via 2D Canvas
 function createLabelSprite(text, x, y, z) {
   const canvas = document.createElement('canvas');
   canvas.width = 128; 
@@ -28,20 +27,19 @@ function createLabelSprite(text, x, y, z) {
   return sprite;
 }
 
-// Regenerates text labels across all three coordinate axes
 export function generateAllAxisLabels() {
   if (!currentScene || !audioState.analyser) return;
 
-  // Clear existing label sprites from the scene graph
   labelSprites.forEach(sprite => currentScene.remove(sprite));
   labelSprites = [];
 
-  const { width, depth, freqSamples, timeSamples } = uiConfig;
+  const { width, depth, timeSamples } = uiConfig;
 
-  // 1. Frequency Labels (X-Axis)
-  const numXLabels = 20;
+  // 1. Frequency Labels (X-Axis) - Scaled relative to both minimum and maximum limits
+  const numXLabels = 5;
+  const freqSpan = audioState.targetFrequency - audioState.minFrequency;
   for (let i = 0; i < numXLabels; i++) {
-    const freq = (i / (numXLabels - 1)) * audioState.targetFrequency;
+    const freq = audioState.minFrequency + (i / (numXLabels - 1)) * freqSpan;
     const text = freq < 1000 ? `${Math.round(freq)} Hz` : `${(freq / 1000).toFixed(1)} kHz`;
     const x = -width / 2 + (i / (numXLabels - 1)) * width;
     
@@ -63,7 +61,7 @@ export function generateAllAxisLabels() {
   }
 
   // 3. Timeline Labels (Z-Axis)
-  const totalSeconds = (timeSamples * 16.67) / 1000;
+  const totalSeconds = audioState.timeWindow;
   for (let i = 0; i < 5; i++) {
     const fraction = i / 4;
     const text = fraction === 0 ? 'Now' : `-${(fraction * totalSeconds).toFixed(1)}s`;
@@ -75,20 +73,21 @@ export function generateAllAxisLabels() {
   }
 }
 
-// Initialises the UI layer by caching the scene context and mounting listeners
 export function initUI(scene, config) {
   currentScene = scene;
   uiConfig = config;
 
   const startButton = document.getElementById('startButton');
+  const minFreqSlider = document.getElementById('minFreqSlider');
+  const minFreqLabel = document.getElementById('minFreqLabel');
   const freqSlider = document.getElementById('freqSlider');
   const sliderLabel = document.getElementById('sliderLabel');
+  const timeSlider = document.getElementById('timeSlider');
+  const timeLabel = document.getElementById('timeLabel');
 
-  // Handle stream toggle interactions
   startButton.addEventListener('click', () => {
     if (!audioState.isRecording) {
       startButton.textContent = 'Stop';
-      // Generate labels once hardware metrics are confirmed on stream success
       startAudio(() => generateAllAxisLabels());
     } else {
       startButton.textContent = 'Start';
@@ -96,11 +95,38 @@ export function initUI(scene, config) {
     }
   });
 
-  // Handle dynamic frequency capping modifications
-  freqSlider.addEventListener('input', (e) => {
-    audioState.targetFrequency = parseInt(e.target.value);
-    sliderLabel.textContent = `Max Frequency: ${(audioState.targetFrequency / 1000).toFixed(1)} kHz`;
+  // Handle dynamic minimum frequency cutoff modifications
+  minFreqSlider.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value);
+    audioState.minFrequency = val;
+    minFreqLabel.textContent = val < 1000 ? `Min Frequency: ${val} Hz` : `Min Frequency: ${(val / 1000).toFixed(1)} kHz`;
     
+    // Lock slider properties so user cannot push minimum value past the maximum window
+    freqSlider.min = val + 1000;
+
+    if (audioState.context && audioState.analyser) {
+      generateAllAxisLabels();
+    }
+  });
+
+  // Handle dynamic maximum frequency ceiling modifications
+  freqSlider.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value);
+    audioState.targetFrequency = val;
+    sliderLabel.textContent = `Max Frequency: ${(val / 1000).toFixed(1)} kHz`;
+    
+    // Lock slider properties so user cannot pull maximum value below the minimum window
+    minFreqSlider.max = val - 1000;
+
+    if (audioState.context && audioState.analyser) {
+      generateAllAxisLabels();
+    }
+  });
+
+  timeSlider.addEventListener('input', (e) => {
+    const seconds = parseFloat(e.target.value);
+    audioState.timeWindow = seconds;
+    timeLabel.textContent = `Time Window: ${seconds.toFixed(1)}s`;
     if (audioState.context && audioState.analyser) {
       generateAllAxisLabels();
     }
