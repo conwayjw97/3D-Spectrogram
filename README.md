@@ -10,28 +10,28 @@ Hosted version: https://conwayjw97.github.io/Spectrogram-3D/
 
 ## Key Features
 
-* **Dual-Mesh Terrain Rendering:** Combines plane geometry with custom vertex and fragment shaders to dynamically deform a solid mesh with a wireframe overlay[cite: 1].
-* **Interactive Viewport:** Built-in `OrbitControls` let you rotate, pan, and zoom to inspect the frequency terrain from any angle[cite: 1].
+* **Dual-Mesh Terrain Rendering:** Combines plane geometry with custom vertex and fragment shaders to dynamically deform a solid mesh with a wireframe overlay.
+* **Interactive Viewport:** Built-in `OrbitControls` let you rotate, pan, and zoom to inspect the frequency terrain from any angle.
 * **Real-time Edge Analysis:**
-  * **Front (X-Axis):** Active real-time frequency spectrum[cite: 1].
-  * **Back (Peak Hold):** A historic maximum spectrum (Peak Hold) trace that maps transient peaks over the full time window[cite: 1].
-  * **Left (Z-Axis):** Maximum historical amplitude trace over time[cite: 1].
-  * **Right (Z-Axis):** Average historical amplitude trace over time[cite: 1].
+  * **Front (X-Axis):** Active real-time frequency spectrum.
+  * **Back (Peak Hold):** A historic maximum spectrum (Peak Hold) trace that maps transient peaks over the full time window.
+  * **Left (Z-Axis):** Maximum historical amplitude trace over time.
+  * **Right (Z-Axis):** Average historical amplitude trace over time.
 * **Dynamic Billboard Labels:** Auto-orienting 2D labels that scale dynamically, detailing active frequencies (Hz/kHz), decibels (dB), and time history.
-* **Interactive Control Panel:** Real-time sliders to modulate the min/max frequencies, adjust the temporal window, and toggle between microphone or audio stream inputs[cite: 1].
+* **Interactive Control Panel:** Real-time sliders to modulate the min/max frequencies, adjust the temporal window, and toggle between microphone or audio stream inputs.
 
 ## Tech Stack
 
-* **Three.js:** Handles 3D rendering, lighting, lines, and sprite rendering[cite: 1].
-* **GLSL Shaders:** Custom vertex and fragment shaders process high-frequency displacement calculations directly on the GPU[cite: 1].
-* **Web Audio API:** Manages real-time audio routing, FFT analysis, and custom source selection[cite: 1].
+* **Three.js:** Handles 3D rendering, lighting, lines, and sprite rendering.
+* **GLSL Shaders:** Custom vertex and fragment shaders process high-frequency displacement calculations directly on the GPU.
+* **Web Audio API:** Manages real-time audio routing, FFT analysis, and custom source selection.
 
 ## File Structure
 
-* `app.js`: Main initialisation file, responsible for setting up the Three.js viewport, managing the rendering loop, and updating the boundary data[cite: 1].
+* `app.js`: Main initialisation file, responsible for setting up the Three.js viewport, managing the rendering loop, and updating the boundary data.
 * `ui.js`: Manages user control bindings, updates axis labels dynamically, and handles layout rendering.
 * `audio.js`: Configures the audio context, handles permissions, and processes live frequency buffers.
-* `shaders.js`: Houses custom GLSL shader code for material styling and mesh displacement[cite: 1].
+* `shaders.js`: Houses custom GLSL shader code for material styling and mesh displacement.
 
 ## Getting Started
 
