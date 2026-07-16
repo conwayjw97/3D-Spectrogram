@@ -3,12 +3,14 @@ export const audioState = {
   analyser: null,
   dataArray: null,
   isRecording: false,
-  minFrequency: 0,        // Tracking parameter for low end frequency cutoff
-  targetFrequency: 10000, // Tracking parameter for high end frequency cutoff
-  timeWindow: 2.0         // Initialised at 2.0 seconds
+  minFrequency: 0,
+  targetFrequency: 10000,
+  timeWindow: 2.0,
+  sourceType: 'mic',    // Tracks current active input selection ('mic' or 'tab')
+  activeStream: null    // Holds reference to stream tracks for explicit closure
 };
 
-export function startAudio(onSuccess) {
+export async function startAudio(onSuccess) {
   if (!audioState.context) {
     audioState.context = new (window.AudioContext || window.webkitAudioContext)();
     audioState.analyser = audioState.context.createAnalyser();
@@ -19,25 +21,64 @@ export function startAudio(onSuccess) {
 
     const bufferLength = audioState.analyser.frequencyBinCount; 
     audioState.dataArray = new Uint8Array(bufferLength);
-
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(stream => {
-        const source = audioState.context.createMediaStreamSource(stream);
-        source.connect(audioState.analyser);
-        audioState.isRecording = true;
-        if (onSuccess) onSuccess();
-      })
-      .catch(err => {
-        console.error('Microphone access denied:', err);
-      });
   } else {
     audioState.context.resume();
+  }
+
+  try {
+    let stream;
+    if (audioState.sourceType === 'tab') {
+      // Must request video: true, otherwise browser rejects promise
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
+
+      // Stop the video track immediately to prevent CPU consumption
+      stream.getVideoTracks().forEach(track => track.stop());
+
+      // If the stream contains no audio track
+      if (stream.getAudioTracks().length === 0) {
+        stream.getTracks().forEach(track => track.stop());
+
+        // Check userAgent to identify Firefox
+        const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+        
+        if (isFirefox) {
+          throw new Error(
+            'Firefox does not support capturing browser tab or system audio. ' +
+            'Please run this visualiser in a Chromium-based browser (such as Chrome or Edge) to share tab audio, ' +
+            'or switch your Audio Source back to "Microphone".'
+          );
+        } else {
+          throw new Error(
+            'No audio selected! Ensure the "Share tab audio" checkbox is checked. ' +
+            '(Note: You must share a specific browser tab, as choosing "Entire Screen" or "Window" does not support audio capture.)'
+          );
+        }
+      }
+    } else {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+
+    audioState.activeStream = stream;
+    const source = audioState.context.createMediaStreamSource(stream);
+    source.connect(audioState.analyser);
     audioState.isRecording = true;
+    
     if (onSuccess) onSuccess();
+  } catch (err) {
+    console.error('Failed to acquire audio input stream:', err);
+    stopAudio();
+    alert(err.message || 'Could not access audio stream source.');
   }
 }
 
 export function stopAudio() {
+  if (audioState.activeStream) {
+    audioState.activeStream.getTracks().forEach(track => track.stop());
+    audioState.activeStream = null;
+  }
   if (audioState.context) {
     audioState.context.close();
     audioState.context = null;

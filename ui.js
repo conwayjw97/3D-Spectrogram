@@ -33,13 +33,13 @@ export function generateAllAxisLabels() {
   labelSprites.forEach(sprite => currentScene.remove(sprite));
   labelSprites = [];
 
-  const { width, depth, timeSamples } = uiConfig;
+  const { width, depth } = uiConfig;
 
-  // 1. Frequency Labels (X-Axis) - Scaled relative to both minimum and maximum limits
+  // 1. Frequency Labels (X-Axis)
   const numXLabels = 5;
-  const freqSpan = audioState.targetFrequency - audioState.minFrequency;
+  const freqSpan = (audioState.targetFrequency || 10000) - (audioState.minFrequency || 0);
   for (let i = 0; i < numXLabels; i++) {
-    const freq = audioState.minFrequency + (i / (numXLabels - 1)) * freqSpan;
+    const freq = (audioState.minFrequency || 0) + (i / (numXLabels - 1)) * freqSpan;
     const text = freq < 1000 ? `${Math.round(freq)} Hz` : `${(freq / 1000).toFixed(1)} kHz`;
     const x = -width / 2 + (i / (numXLabels - 1)) * width;
     
@@ -78,12 +78,16 @@ export function initUI(scene, config) {
   uiConfig = config;
 
   const startButton = document.getElementById('startButton');
+  const sourceSelect = document.getElementById('sourceSelect');
   const minFreqSlider = document.getElementById('minFreqSlider');
   const minFreqLabel = document.getElementById('minFreqLabel');
   const freqSlider = document.getElementById('freqSlider');
   const sliderLabel = document.getElementById('sliderLabel');
   const timeSlider = document.getElementById('timeSlider');
   const timeLabel = document.getElementById('timeLabel');
+
+  // Programmatic fallback to ensure the select element matches our JS default state on refresh
+  sourceSelect.value = audioState.sourceType || 'mic';
 
   startButton.addEventListener('click', () => {
     if (!audioState.isRecording) {
@@ -95,28 +99,43 @@ export function initUI(scene, config) {
     }
   });
 
-  // Handle dynamic minimum frequency cutoff modifications
+  sourceSelect.addEventListener('change', (e) => {
+    const wasRecording = audioState.isRecording;
+    if (wasRecording) {
+      stopAudio();
+      startButton.textContent = 'Start';
+    }
+    audioState.sourceType = e.target.value;
+  });
+
   minFreqSlider.addEventListener('input', (e) => {
     const val = parseInt(e.target.value);
     audioState.minFrequency = val;
     minFreqLabel.textContent = val < 1000 ? `Min Frequency: ${val} Hz` : `Min Frequency: ${(val / 1000).toFixed(1)} kHz`;
-    
-    // Lock slider properties so user cannot push minimum value past the maximum window
     freqSlider.min = val + 1000;
+
+    const currentMaxVal = parseInt(freqSlider.value);
+    if (audioState.targetFrequency !== currentMaxVal) {
+      audioState.targetFrequency = currentMaxVal;
+      sliderLabel.textContent = `Max Frequency: ${(currentMaxVal / 1000).toFixed(1)} kHz`;
+    }
 
     if (audioState.context && audioState.analyser) {
       generateAllAxisLabels();
     }
   });
 
-  // Handle dynamic maximum frequency ceiling modifications
   freqSlider.addEventListener('input', (e) => {
     const val = parseInt(e.target.value);
     audioState.targetFrequency = val;
     sliderLabel.textContent = `Max Frequency: ${(val / 1000).toFixed(1)} kHz`;
-    
-    // Lock slider properties so user cannot pull maximum value below the minimum window
     minFreqSlider.max = val - 1000;
+
+    const currentMinVal = parseInt(minFreqSlider.value);
+    if (audioState.minFrequency !== currentMinVal) {
+      audioState.minFrequency = currentMinVal;
+      minFreqLabel.textContent = currentMinVal < 1000 ? `Min Frequency: ${currentMinVal} Hz` : `Min Frequency: ${(currentMinVal / 1000).toFixed(1)} kHz`;
+    }
 
     if (audioState.context && audioState.analyser) {
       generateAllAxisLabels();
