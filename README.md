@@ -1,6 +1,6 @@
 # 3D Audio Spectrogram Visualiser
 
-A real-time, hardware-accelerated 3D audio spectrogram visualiser that renders incoming audio frequencies from a browser tab or microphone as a dynamic, scrolling terrain. Built using Three.js, custom GLSL shaders, and the Web Audio API.
+A real-time, hardware-accelerated 3D audio spectrogram visualiser that renders incoming audio frequencies from a browser tab or audio input as a dynamic, scrolling terrain. Built using Three.js, custom GLSL shaders, and the Web Audio API.
 
 <img width="1430" height="1308" alt="Untitled" src="https://github.com/user-attachments/assets/80b9b6ef-cce9-4e39-8a87-e29902e91508" />
 
@@ -18,7 +18,7 @@ Hosted version: https://conwayjw97.github.io/Spectrogram-3D/
   * **Left (Z-Axis):** Maximum historical amplitude trace over time.
   * **Right (Z-Axis):** Average historical amplitude trace over time.
 * **Dynamic Billboard Labels:** Auto-orienting 2D labels that scale dynamically, detailing active frequencies (Hz/kHz), decibels (dB), and time history.
-* **Interactive Control Panel:** Real-time sliders to modulate the min/max frequencies, adjust the temporal window, and toggle between microphone or audio stream inputs.
+* **Interactive Control Panel:** Real-time sliders to modulate the min/max frequencies, adjust the temporal window, and toggle between audio input or audio stream inputs.
 
 ## Tech Stack
 

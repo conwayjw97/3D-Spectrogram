@@ -45,7 +45,7 @@ export async function startAudio(onSuccess) {
           throw new Error(
             'Firefox does not support capturing browser tab or system audio. ' +
             'Please run this visualiser in a Chromium-based browser (such as Chrome or Edge) to share tab audio, ' +
-            'or switch your Audio Source back to "Microphone".'
+            'or switch your Audio Source back to "Audio Input".'
           );
         } else {
           throw new Error(
