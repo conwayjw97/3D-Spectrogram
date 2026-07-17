@@ -163,6 +163,7 @@ export function initUI(scene, config) {
   const sliderLabel = document.getElementById('sliderLabel');
   const timeSlider = document.getElementById('timeSlider');
   const timeLabel = document.getElementById('timeLabel');
+  const wireframeToggle = document.getElementById('wireframeToggle');
 
   sourceSelect.value = audioState.sourceType || 'mic';
 
@@ -226,5 +227,9 @@ export function initUI(scene, config) {
     if (audioState.context && audioState.analyser) {
       generateAllAxisLabels();
     }
+  });
+
+  wireframeToggle.addEventListener('change', (e) => {
+    audioState.showWireframe = e.target.checked;
   });
 }

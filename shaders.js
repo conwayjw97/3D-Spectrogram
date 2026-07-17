@@ -1,16 +1,30 @@
 export const vertexShader = `
   uniform sampler2D u_audioTexture;
-  varying float vElevation;
+  uniform float u_writeIndex; // Receives the normalized write position (0.0 to 1.0)
+  varying vec2 vUv;
+  varying float vElevation;   // Declared to pass height data to the fragment shader
 
   void main() {
-    vec4 texData = texture2D(u_audioTexture, uv);
-    float elevation = texData.r * 25.0; 
-    vElevation = elevation;
+    vUv = uv;
 
-    vec3 newPosition = position;
-    newPosition.y += elevation;
+    // Shift the texture lookup dynamically so the newest data lines up with the front edge
+    vec2 circularUv = vec2(uv.x, mod(u_writeIndex - uv.y, 1.0));
 
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+    // Sample data texture using our corrected wrap-around UV coordinate
+    vec4 audioColor = texture2D(u_audioTexture, circularUv);
+    
+    // Extrapolate height displacement matching your original scalar properties
+    // Note: audioColor.r is already normalised between 0.0 and 1.0 by WebGL
+    float displacement = audioColor.r * 25.0;
+    
+    // Assign displacement to the varying variable for the fragment shader
+    vElevation = displacement;
+
+    // Displace vertex height along the local Y axis (upwards after rotation)
+    vec3 displacedPosition = position;
+    displacedPosition.y += displacement;
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(displacedPosition, 1.0);
   }
 `;
 
@@ -39,7 +53,9 @@ export const solidFragmentShader = `
 `;
 
 export const wireFragmentShader = `
-    void main() { 
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.6); 
-    }
+  uniform float u_opacity;
+
+  void main() { 
+      gl_FragColor = vec4(0.0, 0.0, 0.0, u_opacity); 
+  }
 `;

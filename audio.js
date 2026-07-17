@@ -7,7 +7,8 @@ export const audioState = {
   targetFrequency: 10000,
   timeWindow: 2.0,
   sourceType: 'mic',    // Tracks current active input selection ('mic' or 'tab')
-  activeStream: null    // Holds reference to stream tracks for explicit closure
+  activeStream: null,    // Holds reference to stream tracks for explicit closure
+  showWireframe: true // Track wireframe visibility state
 };
 
 export async function startAudio(onSuccess) {
