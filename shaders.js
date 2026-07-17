@@ -1,20 +1,23 @@
 export const vertexShader = `
   uniform sampler2D u_audioTexture;
-  uniform float u_writeIndex; // Receives the normalized write position (0.0 to 1.0)
+  uniform float u_writeIndex;   // Receives the normalized write position (0.0 to 1.0)
+  uniform float u_timeSamples;  // Receives the total grid dimension size to fix edge mirror errors
   varying vec2 vUv;
-  varying float vElevation;   // Declared to pass height data to the fragment shader
+  varying float vElevation;     // Declared to pass height data to the fragment shader
 
   void main() {
     vUv = uv;
 
-    // Shift the texture lookup dynamically so the newest data lines up with the front edge
-    vec2 circularUv = vec2(uv.x, mod(u_writeIndex - uv.y, 1.0));
+    // Scale uv.y down slightly so the final row falls on discrete pixel boundaries instead of a clean 1.0 loop
+    float correctedY = (uv.y * (u_timeSamples - 1.0)) / u_timeSamples;
+
+    // Shift the texture lookup dynamically so the newest data lines up with the front edge safely
+    vec2 circularUv = vec2(uv.x, mod(u_writeIndex - correctedY, 1.0));
 
     // Sample data texture using our corrected wrap-around UV coordinate
     vec4 audioColor = texture2D(u_audioTexture, circularUv);
     
     // Extrapolate height displacement matching your original scalar properties
-    // Note: audioColor.r is already normalised between 0.0 and 1.0 by WebGL
     float displacement = audioColor.r * 25.0;
     
     // Assign displacement to the varying variable for the fragment shader

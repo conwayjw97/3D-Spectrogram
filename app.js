@@ -70,7 +70,8 @@ function setupVisualiserElements() {
 
   const shaderUniforms = {
     u_audioTexture: { value: dataTexture },
-    u_writeIndex: { value: 0.0 }
+    u_writeIndex: { value: 0.0 },
+    u_timeSamples: { value: timeSamples } // Pass precision limits down to GPU
   };
 
   solidMesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
@@ -140,7 +141,8 @@ function setupVisualiserElements() {
   const wireUniforms = {
     u_audioTexture: { value: dataTexture },
     u_writeIndex: { value: 0.0 },
-    u_opacity: { value: wireOpacity }
+    u_opacity: { value: wireOpacity },
+    u_timeSamples: { value: timeSamples } // Pass precision limits down to wire material
   };
 
   wireframeMesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
@@ -257,7 +259,7 @@ function animate() {
         const mappedIndex = Math.min(
           minIndex + Math.floor((i / (freqSamples - 1)) * indexRange), 
           audioState.dataArray.length - 1
-        );
+          );
         const val = audioState.dataArray[mappedIndex];
         const index = rowOffset + (i * 4);
         audioData[index] = val;
