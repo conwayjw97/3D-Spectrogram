@@ -93,9 +93,10 @@ function setupVisualiserElements() {
   const size = timeSamples * freqSamples;
   audioData = new Uint8Array(4 * size);
   
+  // Switched to NearestFilter to stop instantaneous time-bleeding across the moving ring buffer seam
   dataTexture = new THREE.DataTexture(audioData, freqSamples, timeSamples, THREE.RGBAFormat);
-  dataTexture.minFilter = THREE.LinearFilter;
-  dataTexture.magFilter = THREE.LinearFilter;
+  dataTexture.minFilter = THREE.NearestFilter;
+  dataTexture.magFilter = THREE.NearestFilter;
   dataTexture.needsUpdate = true;
 
   geometry = new THREE.PlaneGeometry(width, depth, freqSamples - 1, timeSamples - 1);
@@ -184,7 +185,6 @@ function setupVisualiserElements() {
   wireframeMesh.visible = audioState.showWireframe;
   scene.add(wireframeMesh);
 
-  // Safely enforce initial or retained visibility states
   updatePerimeterVisibility();
 }
 
@@ -240,7 +240,6 @@ precisionSlider.addEventListener('change', (e) => {
   setupVisualiserElements();
 });
 
-// Attach event tracking listener to the checkbox
 if (perimeterToggle) {
   perimeterToggle.addEventListener('change', updatePerimeterVisibility);
 }
@@ -431,9 +430,7 @@ function animate() {
     backLineGeometry.attributes.position.needsUpdate = true;
   }
 
-  // Update the tooltip on every frame to reflect real-time graph changes
   updateTooltip();
-
   renderer.render(scene, camera);
 }
 
