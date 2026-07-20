@@ -53,7 +53,7 @@ let writeIndex = 0;
 
 let audioData, dataTexture, geometry, solidMesh, wireframeMesh;
 let frontLine, frontLineGeometry;
-let sideLine, sideLineGeometry, historyAmplitudes;
+let maxSideLine, maxSideLineGeometry, historyAmplitudes;
 let avgSideLine, avgSideLineGeometry, historyAvgAmplitudes;
 let backLine, backLineGeometry, peakSpectrum;
 let previousFrameData = null;
@@ -63,14 +63,14 @@ function setupVisualiserElements() {
   if (solidMesh) scene.remove(solidMesh);
   if (wireframeMesh) scene.remove(wireframeMesh);
   if (frontLine) scene.remove(frontLine);
-  if (sideLine) scene.remove(sideLine);
+  if (maxSideLine) scene.remove(maxSideLine);
   if (avgSideLine) scene.remove(avgSideLine);
   if (backLine) scene.remove(backLine);
 
   if (geometry) geometry.dispose();
   if (dataTexture) dataTexture.dispose();
   if (frontLineGeometry) frontLineGeometry.dispose();
-  if (sideLineGeometry) sideLineGeometry.dispose();
+  if (maxSideLineGeometry) maxSideLineGeometry.dispose();
   if (avgSideLineGeometry) avgSideLineGeometry.dispose();
   if (backLineGeometry) backLineGeometry.dispose();
 
@@ -116,17 +116,17 @@ function setupVisualiserElements() {
   frontLine = new THREE.Line(frontLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 10 }));
   scene.add(frontLine);
 
-  sideLineGeometry = new THREE.BufferGeometry();
-  const sideLinePositions = new Float32Array(timeSamples * 3);
+  maxSideLineGeometry = new THREE.BufferGeometry();
+  const maxSideLinePositions = new Float32Array(timeSamples * 3);
   historyAmplitudes = new Float32Array(timeSamples);
   for (let i = 0; i < timeSamples; i++) {
-    sideLinePositions[i * 3] = -width / 2 - 0.2;
-    sideLinePositions[i * 3 + 1] = 0;
-    sideLinePositions[i * 3 + 2] = depth / 2 - (i / (timeSamples - 1)) * depth;
+    maxSideLinePositions[i * 3] = -width / 2 - 0.2;
+    maxSideLinePositions[i * 3 + 1] = 0;
+    maxSideLinePositions[i * 3 + 2] = depth / 2 - (i / (timeSamples - 1)) * depth;
   }
-  sideLineGeometry.setAttribute('position', new THREE.BufferAttribute(sideLinePositions, 3));
-  sideLine = new THREE.Line(sideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 10 }));
-  scene.add(sideLine);
+  maxSideLineGeometry.setAttribute('position', new THREE.BufferAttribute(maxSideLinePositions, 3));
+  maxSideLine = new THREE.Line(maxSideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 10 }));
+  scene.add(maxSideLine);
 
   avgSideLineGeometry = new THREE.BufferGeometry();
   const avgSideLinePositions = new Float32Array(timeSamples * 3);
@@ -170,6 +170,11 @@ function setupVisualiserElements() {
   wireframeMesh.material.uniforms.u_audioTexture.value = dataTexture;
   wireframeMesh.visible = audioState.showWireframe;
   scene.add(wireframeMesh);
+
+  // Enforce the perimeter line visibility state if a redraw is triggered
+  if (typeof updatePerimeterVisibility === 'function') {
+    updatePerimeterVisibility();
+  }
 }
 
 setupVisualiserElements();
@@ -223,6 +228,24 @@ precisionSlider.addEventListener('change', (e) => {
   freqSamples = val;
   setupVisualiserElements();
 });
+
+// Reference and listener for perimeter tracking lines toggle switch
+const perimeterToggle = document.getElementById('perimeterToggle');
+
+function updatePerimeterVisibility() {
+  if (!perimeterToggle) return;
+  // Checked by default to show the tracking lines
+  const showLines = perimeterToggle.checked;
+
+  if (frontLine) frontLine.visible = showLines;
+  if (maxSideLine) maxSideLine.visible = showLines;
+  if (avgSideLine) avgSideLine.visible = showLines;
+  if (backLine) backLine.visible = showLines;
+}
+
+if (perimeterToggle) {
+  perimeterToggle.addEventListener('change', updatePerimeterVisibility);
+}
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -393,19 +416,19 @@ function animate() {
       dataTexture.needsUpdate = true;
     }
 
-    const sidePositions = sideLineGeometry.attributes.position.array;
+    const maxSidePositions = maxSideLineGeometry.attributes.position.array;
     const avgSidePositions = avgSideLineGeometry.attributes.position.array;
     const backPositions = backLineGeometry.attributes.position.array;
 
     for (let i = 0; i < timeSamples; i++) {
-      sidePositions[i * 3 + 1] = historyAmplitudes[i];
+      maxSidePositions[i * 3 + 1] = historyAmplitudes[i];
       avgSidePositions[i * 3 + 1] = historyAvgAmplitudes[i];
     }
     for (let i = 0; i < freqSamples; i++) {
       backPositions[i * 3 + 1] = peakSpectrum[i];
     }
 
-    sideLineGeometry.attributes.position.needsUpdate = true;
+    maxSideLineGeometry.attributes.position.needsUpdate = true;
     avgSideLineGeometry.attributes.position.needsUpdate = true;
     backLineGeometry.attributes.position.needsUpdate = true;
   }
