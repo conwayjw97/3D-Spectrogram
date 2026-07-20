@@ -145,23 +145,24 @@ export function initUI(scene, config, lineGroups = {}) {
   const timeSlider = document.getElementById('timeSlider');
   const timeLabel = document.getElementById('timeLabel');
   const wireframeToggle = document.getElementById('wireframeToggle');
-
-  // Allocate new consolidated guide control dropdown selection
   const visualisationSelect = document.getElementById('visualisationSelect');
+  
+  // Allocate the new color scheme selection node
+  const colorSchemeSelect = document.getElementById('colorSchemeSelect');
 
   sourceSelect.value = audioState.sourceType || 'mic';
 
-  // Synchronise initial dropdown selection state to match incoming audioState flags
+  // Synchronise initial dropdown selection states
   if (visualisationSelect) {
-    if (audioState.disableAllLinesLabels) {
-      visualisationSelect.value = 'none';
-    } else if (audioState.axisLinesOnly) {
-      visualisationSelect.value = 'axis';
-    } else if (audioState.showBlueprintLines && audioState.showTopLines) {
-      visualisationSelect.value = 'ceiling';
-    } else {
-      visualisationSelect.value = 'blueprint';
-    }
+    if (audioState.disableAllLinesLabels) visualisationSelect.value = 'none';
+    else if (audioState.axisLinesOnly) visualisationSelect.value = 'axis';
+    else if (audioState.showBlueprintLines && audioState.showTopLines) visualisationSelect.value = 'ceiling';
+    else visualisationSelect.value = 'blueprint';
+  }
+
+  if (colorSchemeSelect) {
+    const schemeMapping = ['standard', 'synthwave', 'glacier', 'magma', 'cyberpunk'];
+    colorSchemeSelect.value = schemeMapping[audioState.colorScheme] || 'standard';
   }
 
   startButton.addEventListener('click', () => {
@@ -258,6 +259,20 @@ export function initUI(scene, config, lineGroups = {}) {
       }
 
       syncVisualGuides();
+    });
+  }
+
+  // Handle new palette selections via the color scheme dropdown node
+  if (colorSchemeSelect) {
+    colorSchemeSelect.addEventListener('change', (e) => {
+      const choice = e.target.value;
+      switch (choice) {
+        case 'standard':  audioState.colorScheme = 0; break;
+        case 'synthwave': audioState.colorScheme = 1; break;
+        case 'glacier':   audioState.colorScheme = 2; break;
+        case 'magma':     audioState.colorScheme = 3; break;
+        case 'cyberpunk': audioState.colorScheme = 4; break;
+      }
     });
   }
 
