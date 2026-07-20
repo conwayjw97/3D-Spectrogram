@@ -28,9 +28,11 @@ window.addEventListener('mousemove', (event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  // Move the HTML overlay box relative to the cursor position
-  tooltip.style.left = (event.clientX + 16) + 'px';
-  tooltip.style.top = (event.clientY + 16) + 'px';
+  // Safe guard check prevents style-of-null crashes
+  if (tooltip) {
+    tooltip.style.left = (event.clientX + 16) + 'px';
+    tooltip.style.top = (event.clientY + 16) + 'px';
+  }
 });
 
 // 2. Spectrogram Fixed Boundary Settings
@@ -344,6 +346,7 @@ function animate() {
   }
 
   // Hover Tooltip Raycaster Engine 
+  // Hover Tooltip Raycaster Engine 
   if (solidMesh && solidMesh.visible && audioState.analyser) {
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObject(solidMesh);
@@ -384,19 +387,21 @@ function animate() {
       const timeText = timeIndex === 0 ? "Now" : `-${timeOffsetSec.toFixed(2)}s`;
       const dbText = `${Math.round(currentDb)} dB`;
   
-      // Render out content to window component overlay
-      tooltip.style.display = 'block';
-      tooltip.innerHTML = `
-        <div style="color: #aaa; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px;">Spectrogram Data</div>
-        <strong>Freq:</strong> ${freqText}<br/>
-        <strong>Time:</strong> ${timeText}<br/>
-        <strong>Volume:</strong> ${dbText}
-      `;
+      // Render out content to window component overlay securely
+      if (tooltip) {
+        tooltip.style.display = 'block';
+        tooltip.innerHTML = `
+          <div style="color: #aaa; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px;">Spectrogram Data</div>
+          <strong>Freq:</strong> ${freqText}<br/>
+          <strong>Time:</strong> ${timeText}<br/>
+          <strong>Volume:</strong> ${dbText}
+        `;
+      }
     } else {
-      tooltip.style.display = 'none';
+      if (tooltip) tooltip.style.display = 'none';
     }
   } else {
-    tooltip.style.display = 'none';
+    if (tooltip) tooltip.style.display = 'none';
   }
 
   renderer.render(scene, camera);
