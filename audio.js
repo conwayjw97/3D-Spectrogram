@@ -12,7 +12,8 @@ export const audioState = {
   showTopLines: false,           
   showBlueprintLines: true,      
   axisLinesOnly: false,          
-  disableAllLinesLabels: false   
+  disableAllLinesLabels: false,
+  colorScheme: 0
 };
 
 export async function startAudio(onSuccess) {
