@@ -277,7 +277,6 @@ function updateTooltip() {
       // Render out content to window component overlay
       tooltip.style.display = 'block';
       tooltip.innerHTML = `
-        <div style="color: #aaa; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px;">Spectrogram Data</div>
         <strong>Freq:</strong> ${freqText}<br/>
         <strong>Time:</strong> ${timeText}<br/>
         <strong>Volume:</strong> ${dbText}
