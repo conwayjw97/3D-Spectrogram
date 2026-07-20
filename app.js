@@ -58,6 +58,19 @@ let avgSideLine, avgSideLineGeometry, historyAvgAmplitudes;
 let backLine, backLineGeometry, peakSpectrum;
 let previousFrameData = null;
 
+// Grab DOM reference early to avoid configuration sequence errors
+const perimeterToggle = document.getElementById('perimeterToggle');
+
+function updatePerimeterVisibility() {
+  if (!perimeterToggle) return;
+  const showLines = perimeterToggle.checked;
+
+  if (frontLine) frontLine.visible = showLines;
+  if (maxSideLine) maxSideLine.visible = showLines;
+  if (avgSideLine) avgSideLine.visible = showLines;
+  if (backLine) backLine.visible = showLines;
+}
+
 // 3. Reusable Visualiser Element Lifecycle Setup
 function setupVisualiserElements() {
   if (solidMesh) scene.remove(solidMesh);
@@ -171,10 +184,8 @@ function setupVisualiserElements() {
   wireframeMesh.visible = audioState.showWireframe;
   scene.add(wireframeMesh);
 
-  // Enforce the perimeter line visibility state if a redraw is triggered
-  if (typeof updatePerimeterVisibility === 'function') {
-    updatePerimeterVisibility();
-  }
+  // Safely enforce initial or retained visibility states
+  updatePerimeterVisibility();
 }
 
 setupVisualiserElements();
@@ -211,7 +222,7 @@ createAxisLine([ width / 2, 25,  depth / 2], [ width / 2, 25, -depth / 2], topLi
 createAxisLine([ width / 2, 25, -depth / 2], [-width / 2, 25, -depth / 2], topLinesGroup);   // Back top
 createAxisLine([-width / 2, 25, -depth / 2], [-width / 2, 25,  depth / 2], topLinesGroup);   // Left top
 
-// 5. Initialise User Controls & Precision Listener (Pass line containers down)
+// 5. Initialise User Controls & Precision Listener
 initUI(scene, { width, depth, freqSamples, timeSamples }, { axisLinesGroup, boxLinesGroup, topLinesGroup });
 
 const precisionSlider = document.getElementById('precisionSlider');
@@ -229,20 +240,7 @@ precisionSlider.addEventListener('change', (e) => {
   setupVisualiserElements();
 });
 
-// Reference and listener for perimeter tracking lines toggle switch
-const perimeterToggle = document.getElementById('perimeterToggle');
-
-function updatePerimeterVisibility() {
-  if (!perimeterToggle) return;
-  // Checked by default to show the tracking lines
-  const showLines = perimeterToggle.checked;
-
-  if (frontLine) frontLine.visible = showLines;
-  if (maxSideLine) maxSideLine.visible = showLines;
-  if (avgSideLine) avgSideLine.visible = showLines;
-  if (backLine) backLine.visible = showLines;
-}
-
+// Attach event tracking listener to the checkbox
 if (perimeterToggle) {
   perimeterToggle.addEventListener('change', updatePerimeterVisibility);
 }
