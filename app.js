@@ -21,18 +21,24 @@ camera.lookAt(0, 0, 0);
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const tooltip = document.getElementById('spectrogramTooltip');
-let isMouseOverMesh = false;
 
 // Tracks normalised coordinates inside the viewport
 window.addEventListener('mousemove', (event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  // Safe guard check prevents style-of-null crashes
+  // Move the HTML overlay box relative to the cursor position
   if (tooltip) {
     tooltip.style.left = (event.clientX + 16) + 'px';
     tooltip.style.top = (event.clientY + 16) + 'px';
   }
+
+  updateTooltip();
+});
+
+// Update the tooltip mapping if the camera moves while the graph is paused
+controls.addEventListener('change', () => {
+  updateTooltip();
 });
 
 // 2. Spectrogram Fixed Boundary Settings
@@ -224,6 +230,66 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// Dedicated Raycasting Calculation Engine
+function updateTooltip() {
+  if (!tooltip) return;
+
+  if (solidMesh && solidMesh.visible) {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(solidMesh);
+  
+    if (intersects.length > 0) {
+      const point = intersects[0].point;
+  
+      // 1. Map X-Axis position (-50 to 50) directly to Frequency limits
+      const pctX = (point.x + (width / 2)) / width;
+      const clampedPctX = Math.max(0, Math.min(1, pctX));
+      const minF = audioState.minFrequency || 0;
+      const maxF = audioState.targetFrequency || 10000;
+      const frequencyHz = minF + clampedPctX * (maxF - minF);
+  
+      // 2. Map Z-Axis position (50 is Now, -50 is past) to Time Windows
+      const pctZ = ((depth / 2) - point.z) / depth;
+      const clampedPctZ = Math.max(0, Math.min(1, pctZ));
+      const timeOffsetSec = clampedPctZ * audioState.timeWindow;
+  
+      // 3. Locate array layout indices matching coordinates
+      const freqIndex = Math.floor(clampedPctX * (freqSamples - 1));
+      const timeIndex = Math.floor(clampedPctZ * (timeSamples - 1));
+  
+      // Synchronise extraction sequence against your rolling ring buffer
+      const targetRow = (writeIndex - timeIndex + timeSamples) % timeSamples;
+      const dataIndex = (targetRow * freqSamples + freqIndex) * 4;
+  
+      // Extract raw byte volume density parameter safely
+      const byteValue = audioData ? audioData[dataIndex] : 0;
+  
+      // Translate byte factor back into decibels using active analyser boundaries or safe defaults
+      const dbMin = audioState.analyser ? audioState.analyser.minDecibels : -100;
+      const dbMax = audioState.analyser ? audioState.analyser.maxDecibels : -30;
+      const currentDb = dbMin + (byteValue / 255.0) * (dbMax - dbMin);
+  
+      // Normalise output text formatting
+      const freqText = frequencyHz < 1000 ? `${Math.round(frequencyHz)} Hz` : `${(frequencyHz / 1000).toFixed(2)} kHz`;
+      const timeText = timeIndex === 0 ? "Now" : `-${timeOffsetSec.toFixed(2)}s`;
+      const dbText = `${Math.round(currentDb)} dB`;
+  
+      // Render out content to window component overlay
+      tooltip.style.display = 'block';
+      tooltip.innerHTML = `
+        <div style="color: #aaa; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px;">Spectrogram Data</div>
+        <strong>Freq:</strong> ${freqText}<br/>
+        <strong>Time:</strong> ${timeText}<br/>
+        <strong>Volume:</strong> ${dbText}
+      `;
+    } else {
+      tooltip.style.display = 'none';
+    }
+  } else {
+    tooltip.style.display = 'none';
+  }
+}
+
 // 6. Dynamic Frame Render Engine Loop
 function animate() {
   requestAnimationFrame(animate);
@@ -345,64 +411,8 @@ function animate() {
     backLineGeometry.attributes.position.needsUpdate = true;
   }
 
-  // Hover Tooltip Raycaster Engine 
-  // Hover Tooltip Raycaster Engine 
-  if (solidMesh && solidMesh.visible && audioState.analyser) {
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(solidMesh);
-  
-    if (intersects.length > 0) {
-      const point = intersects[0].point;
-  
-      // 1. Map X-Axis position (-50 to 50) directly to Frequency limits
-      const pctX = (point.x + (width / 2)) / width;
-      const clampedPctX = Math.max(0, Math.min(1, pctX));
-      const minF = audioState.minFrequency || 0;
-      const maxF = audioState.targetFrequency || 10000;
-      const frequencyHz = minF + clampedPctX * (maxF - minF);
-  
-      // 2. Map Z-Axis position (50 is Now, -50 is past) to Time Windows
-      const pctZ = ((depth / 2) - point.z) / depth;
-      const clampedPctZ = Math.max(0, Math.min(1, pctZ));
-      const timeOffsetSec = clampedPctZ * audioState.timeWindow;
-  
-      // 3. Locate array layout indices matching coordinates
-      const freqIndex = Math.floor(clampedPctX * (freqSamples - 1));
-      const timeIndex = Math.floor(clampedPctZ * (timeSamples - 1));
-  
-      // Synchronise extraction sequence against your rolling ring buffer
-      const targetRow = (writeIndex - timeIndex + timeSamples) % timeSamples;
-      const dataIndex = (targetRow * freqSamples + freqIndex) * 4;
-  
-      // Extract raw byte volume density parameter safely
-      const byteValue = audioData ? audioData[dataIndex] : 0;
-  
-      // Translate byte factor back into decibels using your analyser boundaries
-      const dbMin = audioState.analyser.minDecibels;
-      const dbMax = audioState.analyser.maxDecibels;
-      const currentDb = dbMin + (byteValue / 255.0) * (dbMax - dbMin);
-  
-      // Normalise output text formatting
-      const freqText = frequencyHz < 1000 ? `${Math.round(frequencyHz)} Hz` : `${(frequencyHz / 1000).toFixed(2)} kHz`;
-      const timeText = timeIndex === 0 ? "Now" : `-${timeOffsetSec.toFixed(2)}s`;
-      const dbText = `${Math.round(currentDb)} dB`;
-  
-      // Render out content to window component overlay securely
-      if (tooltip) {
-        tooltip.style.display = 'block';
-        tooltip.innerHTML = `
-          <div style="color: #aaa; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px;">Spectrogram Data</div>
-          <strong>Freq:</strong> ${freqText}<br/>
-          <strong>Time:</strong> ${timeText}<br/>
-          <strong>Volume:</strong> ${dbText}
-        `;
-      }
-    } else {
-      if (tooltip) tooltip.style.display = 'none';
-    }
-  } else {
-    if (tooltip) tooltip.style.display = 'none';
-  }
+  // Update the tooltip on every frame to reflect real-time graph changes
+  updateTooltip();
 
   renderer.render(scene, camera);
 }
