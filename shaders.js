@@ -25,9 +25,9 @@ export const vertexShader = `
 
 export const solidFragmentShader = `
   uniform int u_colorScheme;
-varying float vElevation;
-
-void main() {
+  varying float vElevation;
+  
+  void main() {
     // Normalise the world-space vertex height into a 0.0 to 1.0 factor
     float factor = clamp(vElevation / 25.0, 0.0, 1.0);
     vec3 finalColour = vec3(0.0);
