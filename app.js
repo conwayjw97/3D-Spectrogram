@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { vertexShader, solidFragmentShader, wireFragmentShader } from './shaders.js';
 import { audioState } from './audio.js';
 import { initUI } from './ui.js';
-import { COLOUR_SCHEMES, applyColourScheme } from './colors.js';
+import { COLOUR_SCHEMES, applyColourScheme } from './colours.js';
 
 // 1. Initialise Scene and Viewport Engine
 const scene = new THREE.Scene();
