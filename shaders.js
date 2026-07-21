@@ -48,6 +48,6 @@ export const wireFragmentShader = `
   uniform float u_opacity;
   
   void main() {
-    gl_FragColor = vec4(1.0, 1.0, 1.0, u_opacity);
+    gl_FragColor = vec4(0.05, 0.05, 0.05, u_opacity);
   }
 `;

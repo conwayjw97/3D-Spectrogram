@@ -33,11 +33,21 @@ export const COLOUR_SCHEMES = {
   }
 };
 
+const SCHEME_KEYS = ['standard', 'synthwave', 'glacier', 'magma', 'cyberpunk'];
+
 /**
- * Updates a material's colour uniforms in-place without re-initialising shaders.
+ * Updates a material's colour uniforms in-place, accepting string keys or numeric indices.
  */
 export function applyColourScheme(material, schemeKey) {
-  const scheme = COLOUR_SCHEMES[schemeKey] || COLOUR_SCHEMES.standard;
+  let resolvedKey = schemeKey;
+
+  // Resolve numerical indices or index strings (e.g. 0, 1 or "0", "1") to scheme names
+  if (typeof schemeKey === 'number' || (typeof schemeKey === 'string' && !isNaN(Number(schemeKey)))) {
+    resolvedKey = SCHEME_KEYS[Number(schemeKey)] || 'standard';
+  }
+
+  const scheme = COLOUR_SCHEMES[resolvedKey] || COLOUR_SCHEMES.standard;
+
   if (material && material.uniforms) {
     if (material.uniforms.u_colorBase) material.uniforms.u_colorBase.value.copy(scheme.base);
     if (material.uniforms.u_colorLow)  material.uniforms.u_colorLow.value.copy(scheme.low);
