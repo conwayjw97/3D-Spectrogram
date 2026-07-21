@@ -28,7 +28,6 @@ window.addEventListener('mousemove', (event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  // Move the HTML overlay box relative to the cursor position
   if (tooltip) {
     tooltip.style.left = (event.clientX + 16) + 'px';
     tooltip.style.top = (event.clientY + 16) + 'px';
@@ -37,7 +36,6 @@ window.addEventListener('mousemove', (event) => {
   updateTooltip();
 });
 
-// Update the tooltip mapping if the camera moves while the graph is paused
 controls.addEventListener('change', () => {
   updateTooltip();
 });
@@ -57,10 +55,8 @@ let frontLine, frontLineGeometry;
 let maxSideLine, maxSideLineGeometry, historyAmplitudes;
 let avgSideLine, avgSideLineGeometry, historyAvgAmplitudes;
 let backLine, backLineGeometry, peakSpectrum;
-let hoverIndicatorGroup, hoverLine, hoverDot; // <--- Declared in outer scope
-let previousFrameData = null;
+let hoverIndicatorGroup, hoverLine, hoverDot;
 
-// Grab DOM reference early to avoid configuration sequence errors
 const perimeterToggle = document.getElementById('perimeterToggle');
 
 function updatePerimeterVisibility() {
@@ -75,13 +71,35 @@ function updatePerimeterVisibility() {
 
 // 3. Reusable Visualiser Element Lifecycle Setup
 function setupVisualiserElements() {
-  if (solidMesh) scene.remove(solidMesh);
-  if (wireframeMesh) scene.remove(wireframeMesh);
-  if (frontLine) scene.remove(frontLine);
-  if (maxSideLine) scene.remove(maxSideLine);
-  if (avgSideLine) scene.remove(avgSideLine);
-  if (backLine) scene.remove(backLine);
-  if (hoverIndicatorGroup) scene.remove(hoverIndicatorGroup); // Remove existing indicator group
+  if (solidMesh) {
+    scene.remove(solidMesh);
+    if (solidMesh.material) solidMesh.material.dispose();
+  }
+  if (wireframeMesh) {
+    scene.remove(wireframeMesh);
+    if (wireframeMesh.material) wireframeMesh.material.dispose();
+  }
+  if (frontLine) {
+    scene.remove(frontLine);
+    if (frontLine.material) frontLine.material.dispose();
+  }
+  if (maxSideLine) {
+    scene.remove(maxSideLine);
+    if (maxSideLine.material) maxSideLine.material.dispose();
+  }
+  if (avgSideLine) {
+    scene.remove(avgSideLine);
+    if (avgSideLine.material) avgSideLine.material.dispose();
+  }
+  if (backLine) {
+    scene.remove(backLine);
+    if (backLine.material) backLine.material.dispose();
+  }
+  if (hoverIndicatorGroup) {
+    scene.remove(hoverIndicatorGroup);
+    if (hoverLine && hoverLine.material) hoverLine.material.dispose();
+    if (hoverDot && hoverDot.material) hoverDot.material.dispose();
+  }
 
   if (geometry) geometry.dispose();
   if (dataTexture) dataTexture.dispose();
@@ -89,11 +107,10 @@ function setupVisualiserElements() {
   if (maxSideLineGeometry) maxSideLineGeometry.dispose();
   if (avgSideLineGeometry) avgSideLineGeometry.dispose();
   if (backLineGeometry) backLineGeometry.dispose();
-  if (hoverLine) hoverLine.geometry.dispose();
-  if (hoverDot) hoverDot.geometry.dispose();
+  if (hoverLine && hoverLine.geometry) hoverLine.geometry.dispose();
+  if (hoverDot && hoverDot.geometry) hoverDot.geometry.dispose();
 
   writeIndex = 0;
-  previousFrameData = new Float32Array(freqSamples);
 
   const size = timeSamples * freqSamples;
   audioData = new Uint8Array(4 * size);
@@ -140,7 +157,7 @@ function setupVisualiserElements() {
     frontLinePositions[i * 3 + 2] = depth / 2 + 0.1;
   }
   frontLineGeometry.setAttribute('position', new THREE.BufferAttribute(frontLinePositions, 3));
-  frontLine = new THREE.Line(frontLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 10 }));
+  frontLine = new THREE.Line(frontLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
   scene.add(frontLine);
 
   maxSideLineGeometry = new THREE.BufferGeometry();
@@ -152,7 +169,7 @@ function setupVisualiserElements() {
     maxSideLinePositions[i * 3 + 2] = depth / 2 - (i / (timeSamples - 1)) * depth;
   }
   maxSideLineGeometry.setAttribute('position', new THREE.BufferAttribute(maxSideLinePositions, 3));
-  maxSideLine = new THREE.Line(maxSideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 10 }));
+  maxSideLine = new THREE.Line(maxSideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
   scene.add(maxSideLine);
 
   avgSideLineGeometry = new THREE.BufferGeometry();
@@ -164,7 +181,7 @@ function setupVisualiserElements() {
     avgSideLinePositions[i * 3 + 2] = depth / 2 - (i / (timeSamples - 1)) * depth;
   }
   avgSideLineGeometry.setAttribute('position', new THREE.BufferAttribute(avgSideLinePositions, 3));
-  avgSideLine = new THREE.Line(avgSideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 10 }));
+  avgSideLine = new THREE.Line(avgSideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
   scene.add(avgSideLine);
 
   backLineGeometry = new THREE.BufferGeometry();
@@ -176,7 +193,7 @@ function setupVisualiserElements() {
     backLinePositions[i * 3 + 2] = -depth / 2 - 0.2;
   }
   backLineGeometry.setAttribute('position', new THREE.BufferAttribute(backLinePositions, 3));
-  backLine = new THREE.Line(backLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 10 }));
+  backLine = new THREE.Line(backLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
   scene.add(backLine);
 
   const wireOpacity = Math.max(0.03, 0.6 * (128 / freqSamples));
@@ -230,22 +247,22 @@ function createAxisLine(start, end, targetGroup) {
 }
 
 // Minimal Primary Structural Axes
-createAxisLine([-width / 2, 0,  depth / 2], [ width / 2, 0,  depth / 2], axisLinesGroup); // X Axis
-createAxisLine([-width / 2, 0,  depth / 2], [-width / 2, 25,  depth / 2], axisLinesGroup); // Y Axis
-createAxisLine([-width / 2, 0, -depth / 2], [-width / 2, 0,  depth / 2], axisLinesGroup); // Z Axis
+createAxisLine([-width / 2, 0,  depth / 2], [ width / 2, 0,  depth / 2], axisLinesGroup);
+createAxisLine([-width / 2, 0,  depth / 2], [-width / 2, 25,  depth / 2], axisLinesGroup);
+createAxisLine([-width / 2, 0, -depth / 2], [-width / 2, 0,  depth / 2], axisLinesGroup);
 
 // Outer Blueprint Framing Extensions
-createAxisLine([ width / 2, 0,  depth / 2], [ width / 2, 0, -depth / 2], boxLinesGroup);    // Right floor boundary
-createAxisLine([ width / 2, 0, -depth / 2], [-width / 2, 0, -depth / 2], boxLinesGroup);    // Back floor boundary
-createAxisLine([-width / 2, 0, -depth / 2], [-width / 2, 25, -depth / 2], boxLinesGroup);   // Back-Left pillar
-createAxisLine([ width / 2, 0, -depth / 2], [ width / 2, 25, -depth / 2], boxLinesGroup);   // Back-Right pillar
-createAxisLine([ width / 2, 0,  depth / 2], [ width / 2, 25,  depth / 2], boxLinesGroup);   // Front-Right pillar
+createAxisLine([ width / 2, 0,  depth / 2], [ width / 2, 0, -depth / 2], boxLinesGroup);
+createAxisLine([ width / 2, 0, -depth / 2], [-width / 2, 0, -depth / 2], boxLinesGroup);
+createAxisLine([-width / 2, 0, -depth / 2], [-width / 2, 25, -depth / 2], boxLinesGroup);
+createAxisLine([ width / 2, 0, -depth / 2], [ width / 2, 25, -depth / 2], boxLinesGroup);
+createAxisLine([ width / 2, 0,  depth / 2], [ width / 2, 25,  depth / 2], boxLinesGroup);
 
-// Upper Structural Bounds (y = 25 Ceiling Perimeter)
-createAxisLine([-width / 2, 25,  depth / 2], [ width / 2, 25,  depth / 2], topLinesGroup);   // Front top
-createAxisLine([ width / 2, 25,  depth / 2], [ width / 2, 25, -depth / 2], topLinesGroup);   // Right top
-createAxisLine([ width / 2, 25, -depth / 2], [-width / 2, 25, -depth / 2], topLinesGroup);   // Back top
-createAxisLine([-width / 2, 25, -depth / 2], [-width / 2, 25,  depth / 2], topLinesGroup);   // Left top
+// Upper Structural Bounds
+createAxisLine([-width / 2, 25,  depth / 2], [ width / 2, 25,  depth / 2], topLinesGroup);
+createAxisLine([ width / 2, 25,  depth / 2], [ width / 2, 25, -depth / 2], topLinesGroup);
+createAxisLine([ width / 2, 25, -depth / 2], [-width / 2, 25, -depth / 2], topLinesGroup);
+createAxisLine([-width / 2, 25, -depth / 2], [-width / 2, 25,  depth / 2], topLinesGroup);
 
 // 5. Initialise User Controls & Precision Listener
 initUI(scene, { width, depth, freqSamples, timeSamples }, { axisLinesGroup, boxLinesGroup, topLinesGroup });
@@ -285,40 +302,33 @@ function updateTooltip() {
   if (solidMesh && solidMesh.visible) {
     raycaster.setFromCamera(mouse, camera);
 
-    // Fast mathematical ray intersection against Y = 0 (No CPU mesh checking)
     const hit = raycaster.ray.intersectPlane(floorPlane, intersectionPoint);
 
-    // Ensure the cursor is inside the graph boundaries
     if (hit && Math.abs(intersectionPoint.x) <= width / 2 && Math.abs(intersectionPoint.z) <= depth / 2) {
       const x = intersectionPoint.x;
       const z = intersectionPoint.z;
 
-      // Normalise floor coordinates to 0.0 - 1.0 range
       const pctX = (x + width / 2) / width;
       const pctZ = (depth / 2 - z) / depth;
 
       const clampedPctX = Math.max(0, Math.min(1, pctX));
       const clampedPctZ = Math.max(0, Math.min(1, pctZ));
 
-      // Direct O(1) buffer lookup for the corresponding height at this floor point
       const freqIndex = Math.floor(clampedPctX * (freqSamples - 1));
       const timeIndex = Math.floor(clampedPctZ * (timeSamples - 1));
       const dataIndex = (timeIndex * freqSamples + freqIndex) * 4;
 
       const byteValue = audioData ? audioData[dataIndex] : 0;
-      const peakY = (byteValue / 255.0) * 25.0; // Scaled height in world units
+      const peakY = (byteValue / 255.0) * 25.0;
 
-      // Draw vertical guide line rising UP from floor to peak
       const linePositions = hoverLine.geometry.attributes.position.array;
       linePositions[0] = x; linePositions[1] = 0;     linePositions[2] = z;
       linePositions[3] = x; linePositions[4] = peakY; linePositions[5] = z;
       hoverLine.geometry.attributes.position.needsUpdate = true;
 
-      // Snap the marker dot to the top of the peak
       hoverDot.position.set(x, peakY, z);
       hoverIndicatorGroup.visible = true;
 
-      // Format Tooltip Text
       const minF = audioState.minFrequency || 0;
       const maxF = audioState.targetFrequency || 10000;
       const frequencyHz = minF + clampedPctX * (maxF - minF);
@@ -398,31 +408,25 @@ function animate() {
     const targetInterval = (audioState.timeWindow * 1000) / timeSamples;
     let updatedThisFrame = false;
 
-    const stepsToTake = Math.floor(timeAccumulator / targetInterval);
-    let stepCount = 0;
-
     while (timeAccumulator >= targetInterval) {
       timeAccumulator -= targetInterval;
       updatedThisFrame = true;
-      stepCount++;
 
-      // 1. Shift all texture rows down by one row space to clear room at the top
+      // 1. Shift texture rows down by one row space
       const rowSize = freqSamples * 4;
       audioData.copyWithin(rowSize, 0, audioData.length - rowSize);
 
-      // 2. Shift the perimeter history arrays down
+      // 2. Shift perimeter history arrays down
       for (let i = timeSamples - 1; i > 0; i--) {
         historyAmplitudes[i] = historyAmplitudes[i - 1];
         historyAvgAmplitudes[i] = historyAvgAmplitudes[i - 1];
       }
 
-      const t = stepsToTake > 0 ? stepCount / stepsToTake : 1.0;
-
-      // 3. Inject the new frame data directly at the beginning of the texture (Row 0)
+      // 3. Inject raw current frame data directly into Row 0
       for (let i = 0; i < freqSamples; i++) {
-        const val = previousFrameData[i] * (1.0 - t) + currentFrameData[i] * t;
-        const index = i * 4; // Row 0 offset
-        audioData[index] = val;
+        const val = currentFrameData[i];
+        const index = i * 4;
+        audioData[index]     = val;
         audioData[index + 1] = val;
         audioData[index + 2] = val;
         audioData[index + 3] = 255;
@@ -431,8 +435,6 @@ function animate() {
       historyAmplitudes[0] = (currentFramePeak / 255.0) * 25.0;
       historyAvgAmplitudes[0] = (currentFrameAvg / 255.0) * 25.0;
     }
-
-    previousFrameData.set(currentFrameData);
 
     if (updatedThisFrame) {
       for (let j = 0; j < freqSamples; j++) {
@@ -445,7 +447,6 @@ function animate() {
         peakSpectrum[j] = (maxBinVal / 255.0) * 25.0;
       }
 
-      // Lock the offset uniform to 0.0 since the data layout is no longer rolling
       solidMesh.material.uniforms.u_writeIndex.value = 0.0;
       wireframeMesh.material.uniforms.u_writeIndex.value = 0.0;
 
