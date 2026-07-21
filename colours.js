@@ -2,34 +2,39 @@ import * as THREE from 'three';
 
 export const COLOUR_SCHEMES = {
   standard: {
-    base: new THREE.Color('#002b00'), // Dark Green Base
-    low:  new THREE.Color('#00ff00'), // Bright Green
-    mid:  new THREE.Color('#ffff00'), // Yellow
-    high: new THREE.Color('#ff0000')  // Red
+    // Standard: Dark Green -> Neon Green -> Yellow -> Red
+    base: new THREE.Color(0.0, 0.25, 0.0),
+    low:  new THREE.Color(0.0, 1.0, 0.0),
+    mid:  new THREE.Color(1.0, 1.0, 0.0),
+    high: new THREE.Color(1.0, 0.0, 0.0)
   },
   synthwave: {
-    base: new THREE.Color('#10002b'), // Deep Dark Violet
-    low:  new THREE.Color('#5a189a'), // Mid Purple
-    mid:  new THREE.Color('#ff007f'), // Neon Pink
-    high: new THREE.Color('#00f0ff')  // Electric Cyan
+    // Synthwave: Neon Purple -> Pink -> Orange -> Yellow
+    base: new THREE.Color(0.2, 0.0, 0.4),
+    low:  new THREE.Color(0.9, 0.1, 0.5),
+    mid:  new THREE.Color(1.0, 0.5, 0.0),
+    high: new THREE.Color(1.0, 0.9, 0.2)
   },
   glacier: {
-    base: new THREE.Color('#020c1b'), // Deep Abyssal Blue
-    low:  new THREE.Color('#051923'), // Navy
-    mid:  new THREE.Color('#00a6fb'), // Ice Blue
-    high: new THREE.Color('#ffffff')  // Pure White
+    // Glacier: Deep Blue -> Electric Cyan -> White
+    base: new THREE.Color(0.0, 0.1, 0.4),
+    low:  new THREE.Color(0.0, 0.567, 0.733),
+    mid:  new THREE.Color(0.333, 0.867, 0.933),
+    high: new THREE.Color(1.0, 1.0, 1.0)
   },
   magma: {
-    base: new THREE.Color('#000004'), // Near Black
-    low:  new THREE.Color('#51127c'), // Deep Purple
-    mid:  new THREE.Color('#b5367a'), // Flame Magenta
-    high: new THREE.Color('#fcfdbf')  // Bright Yellow
+    // Magma: Dark Red -> Fiery Orange -> Bright Yellow
+    base: new THREE.Color(0.3, 0.0, 0.0),
+    low:  new THREE.Color(0.7, 0.2, 0.0),
+    mid:  new THREE.Color(0.933, 0.5, 0.033),
+    high: new THREE.Color(1.0, 0.9, 0.1)
   },
   cyberpunk: {
-    base: new THREE.Color('#0d0221'), // Dark Indigo
-    low:  new THREE.Color('#200122'), // Dark Violet
-    mid:  new THREE.Color('#ff0055'), // Neon Red
-    high: new THREE.Color('#ffcc00')  // Bright Gold
+    // Cyberpunk: Neon Teal -> Acid Magenta
+    base: new THREE.Color(0.0, 0.9, 0.8),
+    low:  new THREE.Color(0.3, 0.6, 0.7),
+    mid:  new THREE.Color(0.6, 0.3, 0.6),
+    high: new THREE.Color(0.9, 0.0, 0.5)
   }
 };
 
