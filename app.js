@@ -194,6 +194,21 @@ function setupVisualiserElements() {
   wireframeMesh.visible = audioState.showWireframe;
   scene.add(wireframeMesh);
 
+  // Hover Guide Indicator (Vertical Line + Peak Marker Dot)
+  const hoverIndicatorGroup = new THREE.Group();
+  const lineGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+  const hoverLine = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: 0x00ffff, depthTest: false }));
+  const hoverDot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.6, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0x00ffff, depthTest: false })
+  );
+
+  hoverIndicatorGroup.add(hoverLine);
+  hoverIndicatorGroup.add(hoverDot);
+  hoverIndicatorGroup.visible = false;
+  hoverIndicatorGroup.renderOrder = 999;
+  scene.add(hoverIndicatorGroup);
+
   updatePerimeterVisibility();
 }
 
@@ -260,50 +275,62 @@ window.addEventListener('resize', () => {
 });
 
 // Dedicated Raycasting Calculation Engine
+const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const intersectionPoint = new THREE.Vector3();
+
 function updateTooltip() {
   if (!tooltip) return;
 
   if (solidMesh && solidMesh.visible) {
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(solidMesh);
-  
-    if (intersects.length > 0) {
-      const point = intersects[0].point;
-  
-      // 1. Map X-Axis position (-50 to 50) directly to Frequency limits
-      const pctX = (point.x + (width / 2)) / width;
+
+    // Fast mathematical ray intersection against Y = 0 (No CPU mesh checking)
+    const hit = raycaster.ray.intersectPlane(floorPlane, intersectionPoint);
+
+    // Ensure the cursor is inside the graph boundaries
+    if (hit && Math.abs(intersectionPoint.x) <= width / 2 && Math.abs(intersectionPoint.z) <= depth / 2) {
+      const x = intersectionPoint.x;
+      const z = intersectionPoint.z;
+
+      // Normalise floor coordinates to 0.0 - 1.0 range
+      const pctX = (x + width / 2) / width;
+      const pctZ = (depth / 2 - z) / depth;
+
       const clampedPctX = Math.max(0, Math.min(1, pctX));
+      const clampedPctZ = Math.max(0, Math.min(1, pctZ));
+
+      // Direct O(1) buffer lookup for the corresponding height at this floor point
+      const freqIndex = Math.floor(clampedPctX * (freqSamples - 1));
+      const timeIndex = Math.floor(clampedPctZ * (timeSamples - 1));
+      const dataIndex = (timeIndex * freqSamples + freqIndex) * 4;
+
+      const byteValue = audioData ? audioData[dataIndex] : 0;
+      const peakY = (byteValue / 255.0) * 25.0; // Scaled height in world units
+
+      // Draw vertical guide line rising UP from floor to peak
+      const linePositions = hoverLine.geometry.attributes.position.array;
+      linePositions[0] = x; linePositions[1] = 0;     linePositions[2] = z;
+      linePositions[3] = x; linePositions[4] = peakY; linePositions[5] = z;
+      hoverLine.geometry.attributes.position.needsUpdate = true;
+
+      // Snap the marker dot to the top of the peak
+      hoverDot.position.set(x, peakY, z);
+      hoverIndicatorGroup.visible = true;
+
+      // Format Tooltip Text
       const minF = audioState.minFrequency || 0;
       const maxF = audioState.targetFrequency || 10000;
       const frequencyHz = minF + clampedPctX * (maxF - minF);
-  
-      // 2. Map Z-Axis position (50 is Now, -50 is past) to Time Windows
-      const pctZ = ((depth / 2) - point.z) / depth;
-      const clampedPctZ = Math.max(0, Math.min(1, pctZ));
       const timeOffsetSec = clampedPctZ * audioState.timeWindow;
-  
-      // 3. Locate array layout indices matching coordinates
-      const freqIndex = Math.floor(clampedPctX * (freqSamples - 1));
-      const timeIndex = Math.floor(clampedPctZ * (timeSamples - 1));
-  
-      // Synchronise extraction sequence against your rolling ring buffer
-      const targetRow = (writeIndex - timeIndex + timeSamples) % timeSamples;
-      const dataIndex = (targetRow * freqSamples + freqIndex) * 4;
-  
-      // Extract raw byte volume density parameter safely
-      const byteValue = audioData ? audioData[dataIndex] : 0;
-  
-      // Translate byte factor back into decibels using active analyser boundaries or safe defaults
+
       const dbMin = audioState.analyser ? audioState.analyser.minDecibels : -100;
       const dbMax = audioState.analyser ? audioState.analyser.maxDecibels : -30;
       const currentDb = dbMin + (byteValue / 255.0) * (dbMax - dbMin);
-  
-      // Normalise output text formatting
+
       const freqText = frequencyHz < 1000 ? `${Math.round(frequencyHz)} Hz` : `${(frequencyHz / 1000).toFixed(2)} kHz`;
-      const timeText = timeIndex === 0 ? "Now" : `-${timeOffsetSec.toFixed(2)}s`;
+      const timeText = clampedPctZ < 0.01 ? "Now" : `-${timeOffsetSec.toFixed(2)}s`;
       const dbText = `${Math.round(currentDb)} dB`;
-  
-      // Render out content to window component overlay
+
       tooltip.style.display = 'block';
       tooltip.innerHTML = `
         <strong>Freq:</strong> ${freqText}<br/>
@@ -312,9 +339,11 @@ function updateTooltip() {
       `;
     } else {
       tooltip.style.display = 'none';
+      hoverIndicatorGroup.visible = false;
     }
   } else {
     tooltip.style.display = 'none';
+    hoverIndicatorGroup.visible = false;
   }
 }
 
