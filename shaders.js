@@ -1,16 +1,16 @@
 export const vertexShader = `
   uniform sampler2D u_audioTexture;
   varying vec2 vUv;
+  varying float v_amplitude;
 
   void main() {
     vUv = uv;
 
-    // Sample the texture directly using UV coordinates
     vec4 audioSample = texture2D(u_audioTexture, uv);
+    v_amplitude = audioSample.r; // Pass amplitude to fragment shader for colouring
 
     vec3 pos = position;
-    // Scale vertex height directly based on red channel height
-    pos.y = (audioSample.r) * 25.0;
+    pos.y = v_amplitude * 25.0;
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
   }
