@@ -57,6 +57,7 @@ let frontLine, frontLineGeometry;
 let maxSideLine, maxSideLineGeometry, historyAmplitudes;
 let avgSideLine, avgSideLineGeometry, historyAvgAmplitudes;
 let backLine, backLineGeometry, peakSpectrum;
+let hoverIndicatorGroup, hoverLine, hoverDot; // <--- Declared in outer scope
 let previousFrameData = null;
 
 // Grab DOM reference early to avoid configuration sequence errors
@@ -80,6 +81,7 @@ function setupVisualiserElements() {
   if (maxSideLine) scene.remove(maxSideLine);
   if (avgSideLine) scene.remove(avgSideLine);
   if (backLine) scene.remove(backLine);
+  if (hoverIndicatorGroup) scene.remove(hoverIndicatorGroup); // Remove existing indicator group
 
   if (geometry) geometry.dispose();
   if (dataTexture) dataTexture.dispose();
@@ -87,6 +89,8 @@ function setupVisualiserElements() {
   if (maxSideLineGeometry) maxSideLineGeometry.dispose();
   if (avgSideLineGeometry) avgSideLineGeometry.dispose();
   if (backLineGeometry) backLineGeometry.dispose();
+  if (hoverLine) hoverLine.geometry.dispose();
+  if (hoverDot) hoverDot.geometry.dispose();
 
   writeIndex = 0;
   previousFrameData = new Float32Array(freqSamples);
@@ -195,10 +199,10 @@ function setupVisualiserElements() {
   scene.add(wireframeMesh);
 
   // Hover Guide Indicator (Vertical Line + Peak Marker Dot)
-  const hoverIndicatorGroup = new THREE.Group();
+  hoverIndicatorGroup = new THREE.Group();
   const lineGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-  const hoverLine = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: 0x00ffff, depthTest: false }));
-  const hoverDot = new THREE.Mesh(
+  hoverLine = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: 0x00ffff, depthTest: false }));
+  hoverDot = new THREE.Mesh(
     new THREE.SphereGeometry(0.6, 8, 8),
     new THREE.MeshBasicMaterial({ color: 0x00ffff, depthTest: false })
   );
