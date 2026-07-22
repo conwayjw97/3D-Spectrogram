@@ -15,21 +15,23 @@ A real-time, hardware-accelerated 3D audio spectrogram visualiser that renders i
   * **Back (X-Axis):** A historic maximum spectrum (Peak Hold) trace that maps transient peaks over the full time window.
   * **Left (Z-Axis):** Maximum historical amplitude trace over time.
   * **Right (Z-Axis):** Average historical amplitude trace over time.
+* **Raycasting & Hover Inspection Engine:** Interactive floor-plane raycasting inspects coordinates under the cursor in real time, projecting a 3D vertical marker line with a peak dot while displaying exact frequency (Hz/kHz), time offset, and decibel (dB) values in a tooltip.
 * **Dynamic Billboard Labels:** Auto-orienting 2D labels that scale dynamically, detailing active frequencies (Hz/kHz), decibels (dB), and time history.
-* **Interactive Control Panel:** Real-time sliders to modulate the min/max frequencies, adjust the temporal window, and toggle between audio input or audio stream inputs.
+* **Interactive Control Panel:** Real-time controls to modulate min/max frequencies, adjust time windows, switch audio input sources, adjust mesh precision resolution, toggle wireframe/perimeter guides, and select active colour palettes.
 
 ## Tech Stack
 
-* **Three.js:** Handles 3D rendering, lighting, lines, and sprite rendering.
+* **Three.js:** Handles 3D rendering, lighting, line geometries, raycasting, and sprite rendering.
 * **GLSL Shaders:** Custom vertex and fragment shaders process high-frequency displacement calculations directly on the GPU.
 * **Web Audio API:** Manages real-time audio routing, FFT analysis, and custom source selection.
 
 ## File Structure
 
-* `app.js`: Main initialisation file, responsible for setting up the Three.js viewport, managing the rendering loop, and updating the boundary data.
-* `ui.js`: Manages user control bindings, updates axis labels dynamically, and handles layout rendering.
+* `app.js`: Main initialisation file, responsible for setting up the Three.js viewport, managing the rendering loop, raycasting hover engine, and coordinating scene element lifecycles.
+* `ui.js`: Manages user control bindings, updates axis labels dynamically, handles layout rendering, and synchronises visual guide visibilities.
 * `audio.js`: Configures the audio context, handles permissions, and processes live frequency buffers.
 * `shaders.js`: Houses custom GLSL shader code for material styling and mesh displacement.
+* `colours.js`: Defines custom colour schemes and handles uniform colour scheme transitions for shader materials.
 
 ## Getting Started
 
