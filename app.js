@@ -57,23 +57,14 @@ let avgSideLine, avgSideLineGeometry, historyAvgAmplitudes;
 let backLine, backLineGeometry, peakSpectrum;
 let hoverIndicatorGroup, hoverLine, hoverDot;
 
-const perimeterToggle = document.getElementById('perimeterToggle');
-
-function updatePerimeterVisibility() {
-  if (!perimeterToggle) return;
-  const showLines = perimeterToggle.checked;
-
-  if (frontLine) frontLine.visible = showLines;
-  if (maxSideLine) maxSideLine.visible = showLines;
-  if (avgSideLine) avgSideLine.visible = showLines;
-  if (backLine) backLine.visible = showLines;
-
-  // Toggle 3D perimeter text labels
-  syncVisualGuides();
-}
+// Group to hold perimeter lines for central visibility management
+const perimeterLinesGroup = new THREE.Group();
+scene.add(perimeterLinesGroup);
 
 // 3. Reusable Visualiser Element Lifecycle Setup
 function setupVisualiserElements() {
+  perimeterLinesGroup.clear();
+
   if (solidMesh) {
     scene.remove(solidMesh);
     if (solidMesh.material) solidMesh.material.dispose();
@@ -82,22 +73,11 @@ function setupVisualiserElements() {
     scene.remove(wireframeMesh);
     if (wireframeMesh.material) wireframeMesh.material.dispose();
   }
-  if (frontLine) {
-    scene.remove(frontLine);
-    if (frontLine.material) frontLine.material.dispose();
-  }
-  if (maxSideLine) {
-    scene.remove(maxSideLine);
-    if (maxSideLine.material) maxSideLine.material.dispose();
-  }
-  if (avgSideLine) {
-    scene.remove(avgSideLine);
-    if (avgSideLine.material) avgSideLine.material.dispose();
-  }
-  if (backLine) {
-    scene.remove(backLine);
-    if (backLine.material) backLine.material.dispose();
-  }
+  if (frontLine && frontLine.material) frontLine.material.dispose();
+  if (maxSideLine && maxSideLine.material) maxSideLine.material.dispose();
+  if (avgSideLine && avgSideLine.material) avgSideLine.material.dispose();
+  if (backLine && backLine.material) backLine.material.dispose();
+
   if (hoverIndicatorGroup) {
     scene.remove(hoverIndicatorGroup);
     if (hoverLine && hoverLine.material) hoverLine.material.dispose();
@@ -152,6 +132,7 @@ function setupVisualiserElements() {
   solidMesh.material.uniforms.u_audioTexture.value = dataTexture;
   scene.add(solidMesh);
 
+  // Front Line
   frontLineGeometry = new THREE.BufferGeometry();
   const frontLinePositions = new Float32Array(freqSamples * 3);
   for (let i = 0; i < freqSamples; i++) {
@@ -161,8 +142,9 @@ function setupVisualiserElements() {
   }
   frontLineGeometry.setAttribute('position', new THREE.BufferAttribute(frontLinePositions, 3));
   frontLine = new THREE.Line(frontLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
-  scene.add(frontLine);
+  perimeterLinesGroup.add(frontLine);
 
+  // Max Side Line
   maxSideLineGeometry = new THREE.BufferGeometry();
   const maxSideLinePositions = new Float32Array(timeSamples * 3);
   historyAmplitudes = new Float32Array(timeSamples);
@@ -173,8 +155,9 @@ function setupVisualiserElements() {
   }
   maxSideLineGeometry.setAttribute('position', new THREE.BufferAttribute(maxSideLinePositions, 3));
   maxSideLine = new THREE.Line(maxSideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
-  scene.add(maxSideLine);
+  perimeterLinesGroup.add(maxSideLine);
 
+  // Avg Side Line
   avgSideLineGeometry = new THREE.BufferGeometry();
   const avgSideLinePositions = new Float32Array(timeSamples * 3);
   historyAvgAmplitudes = new Float32Array(timeSamples);
@@ -185,8 +168,9 @@ function setupVisualiserElements() {
   }
   avgSideLineGeometry.setAttribute('position', new THREE.BufferAttribute(avgSideLinePositions, 3));
   avgSideLine = new THREE.Line(avgSideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
-  scene.add(avgSideLine);
+  perimeterLinesGroup.add(avgSideLine);
 
+  // Back Line
   backLineGeometry = new THREE.BufferGeometry();
   const backLinePositions = new Float32Array(freqSamples * 3);
   peakSpectrum = new Float32Array(freqSamples);
@@ -197,7 +181,7 @@ function setupVisualiserElements() {
   }
   backLineGeometry.setAttribute('position', new THREE.BufferAttribute(backLinePositions, 3));
   backLine = new THREE.Line(backLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
-  scene.add(backLine);
+  perimeterLinesGroup.add(backLine);
 
   const wireOpacity = Math.max(0.03, 0.6 * (128 / freqSamples));
 
@@ -230,7 +214,7 @@ function setupVisualiserElements() {
   hoverIndicatorGroup.renderOrder = 999;
   scene.add(hoverIndicatorGroup);
 
-  updatePerimeterVisibility();
+  syncVisualGuides();
 }
 
 setupVisualiserElements();
@@ -268,7 +252,11 @@ createAxisLine([ width / 2, 25, -depth / 2], [-width / 2, 25, -depth / 2], topLi
 createAxisLine([-width / 2, 25, -depth / 2], [-width / 2, 25,  depth / 2], topLinesGroup);
 
 // 5. Initialise User Controls & Precision Listener
-initUI(scene, { width, depth, freqSamples, timeSamples }, { axisLinesGroup, boxLinesGroup, topLinesGroup });
+initUI(
+  scene,
+  { width, depth, freqSamples, timeSamples },
+  { axisLinesGroup, boxLinesGroup, topLinesGroup, perimeterLinesGroup }
+);
 
 const precisionSlider = document.getElementById('precisionSlider');
 const precisionLabel = document.getElementById('precisionLabel');
@@ -284,10 +272,6 @@ precisionSlider.addEventListener('change', (e) => {
   freqSamples = val;
   setupVisualiserElements();
 });
-
-if (perimeterToggle) {
-  perimeterToggle.addEventListener('change', updatePerimeterVisibility);
-}
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;

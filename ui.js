@@ -38,28 +38,35 @@ export function setPerimeterLabelsVisible(visible) {
 
 // Consolidated Visibility Synchronisation Logic 
 export function syncVisualGuides() {
-  const { axisLinesGroup, boxLinesGroup, topLinesGroup } = runtimeLineGroups;
-  const perimeterToggle = document.getElementById('perimeterToggle');
-  const showPerimeter = perimeterToggle ? perimeterToggle.checked : true;
+  const { axisLinesGroup, boxLinesGroup, topLinesGroup, perimeterLinesGroup } = runtimeLineGroups;
 
   if (audioState.disableAllLinesLabels) {
+    // Hide all guides, perimeter lines, and labels when disabled
     if (axisLinesGroup) axisLinesGroup.visible = false;
     if (boxLinesGroup) boxLinesGroup.visible = false;
     if (topLinesGroup) topLinesGroup.visible = false;
+    if (perimeterLinesGroup) perimeterLinesGroup.visible = false;
+    
     labelSprites.forEach(sprite => sprite.visible = false);
     perimeterLabelSprites.forEach(sprite => sprite.visible = false);
   } else if (audioState.axisLinesOnly) {
+    // Restrict display strictly to core structural axes & perimeter
     if (axisLinesGroup) axisLinesGroup.visible = true;
     if (boxLinesGroup) boxLinesGroup.visible = false;
     if (topLinesGroup) topLinesGroup.visible = false;
+    if (perimeterLinesGroup) perimeterLinesGroup.visible = true;
+
     labelSprites.forEach(sprite => sprite.visible = true);
-    perimeterLabelSprites.forEach(sprite => sprite.visible = showPerimeter);
+    perimeterLabelSprites.forEach(sprite => sprite.visible = true);
   } else {
+    // Standard modes (blueprint, ceiling)
     if (axisLinesGroup) axisLinesGroup.visible = true;
     if (boxLinesGroup) boxLinesGroup.visible = audioState.showBlueprintLines;
     if (topLinesGroup) topLinesGroup.visible = audioState.showBlueprintLines && audioState.showTopLines;
+    if (perimeterLinesGroup) perimeterLinesGroup.visible = true;
+
     labelSprites.forEach(sprite => sprite.visible = true);
-    perimeterLabelSprites.forEach(sprite => sprite.visible = showPerimeter);
+    perimeterLabelSprites.forEach(sprite => sprite.visible = true);
   }
 }
 
