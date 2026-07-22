@@ -231,14 +231,17 @@ function createAxisLine(start, end, targetGroup) {
   targetGroup.add(line);
 }
 
-// Outer Blueprint Framing Extensions
+// Complete Blueprint Box Framing (Base & Vertical Corner Posts)
+createAxisLine([-width / 2, 0,  depth / 2], [ width / 2, 0,  depth / 2], boxLinesGroup);
+createAxisLine([-width / 2, 0,  depth / 2], [-width / 2, 25,  depth / 2], boxLinesGroup);
+createAxisLine([-width / 2, 0, -depth / 2], [-width / 2, 0,  depth / 2], boxLinesGroup);
 createAxisLine([ width / 2, 0,  depth / 2], [ width / 2, 0, -depth / 2], boxLinesGroup);
 createAxisLine([ width / 2, 0, -depth / 2], [-width / 2, 0, -depth / 2], boxLinesGroup);
 createAxisLine([-width / 2, 0, -depth / 2], [-width / 2, 25, -depth / 2], boxLinesGroup);
 createAxisLine([ width / 2, 0, -depth / 2], [ width / 2, 25, -depth / 2], boxLinesGroup);
 createAxisLine([ width / 2, 0,  depth / 2], [ width / 2, 25,  depth / 2], boxLinesGroup);
 
-// Upper Structural Bounds
+// Upper Structural Bounds (Ceiling)
 createAxisLine([-width / 2, 25,  depth / 2], [ width / 2, 25,  depth / 2], topLinesGroup);
 createAxisLine([ width / 2, 25,  depth / 2], [ width / 2, 25, -depth / 2], topLinesGroup);
 createAxisLine([ width / 2, 25, -depth / 2], [-width / 2, 25, -depth / 2], topLinesGroup);
