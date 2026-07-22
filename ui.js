@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { audioState, startAudio, stopAudio } from './audio.js';
 
 let labelSprites = [];
+let perimeterLabelSprites = []; // Separate array for perimeter line labels
 let currentScene = null;
 let uiConfig = {};
 let runtimeLineGroups = {};
@@ -28,28 +29,37 @@ function createLabelSprite(text, x, y, z, customWidth = 128, customHeight = 32) 
   return sprite;
 }
 
+// Exported function to allow app.js to control perimeter label visibility
+export function setPerimeterLabelsVisible(visible) {
+  perimeterLabelSprites.forEach(sprite => {
+    sprite.visible = visible;
+  });
+}
+
 // Consolidated Visibility Synchronisation Logic 
 export function syncVisualGuides() {
   const { axisLinesGroup, boxLinesGroup, topLinesGroup } = runtimeLineGroups;
+  const perimeterToggle = document.getElementById('perimeterToggle');
+  const showPerimeter = perimeterToggle ? perimeterToggle.checked : true;
 
   if (audioState.disableAllLinesLabels) {
-    // Hide absolutely everything
     if (axisLinesGroup) axisLinesGroup.visible = false;
     if (boxLinesGroup) boxLinesGroup.visible = false;
     if (topLinesGroup) topLinesGroup.visible = false;
     labelSprites.forEach(sprite => sprite.visible = false);
+    perimeterLabelSprites.forEach(sprite => sprite.visible = false);
   } else if (audioState.axisLinesOnly) {
-    // Restrict display strictly to core structural axes
     if (axisLinesGroup) axisLinesGroup.visible = true;
     if (boxLinesGroup) boxLinesGroup.visible = false;
     if (topLinesGroup) topLinesGroup.visible = false;
     labelSprites.forEach(sprite => sprite.visible = true);
+    perimeterLabelSprites.forEach(sprite => sprite.visible = showPerimeter);
   } else {
-    // Evaluate standard modular menu configurations
     if (axisLinesGroup) axisLinesGroup.visible = true;
     if (boxLinesGroup) boxLinesGroup.visible = audioState.showBlueprintLines;
     if (topLinesGroup) topLinesGroup.visible = audioState.showBlueprintLines && audioState.showTopLines;
     labelSprites.forEach(sprite => sprite.visible = true);
+    perimeterLabelSprites.forEach(sprite => sprite.visible = showPerimeter);
   }
 }
 
@@ -57,7 +67,9 @@ export function generateAllAxisLabels() {
   if (!currentScene || !audioState.analyser) return;
 
   labelSprites.forEach(obj => currentScene.remove(obj));
+  perimeterLabelSprites.forEach(obj => currentScene.remove(obj));
   labelSprites = [];
+  perimeterLabelSprites = [];
 
   const { width, depth } = uiConfig;
 
@@ -110,22 +122,22 @@ export function generateAllAxisLabels() {
     labelSprites.push(spriteRightTimeline);
   }
 
-  // 4. Explanatory Labels
+  // 4. Perimeter Explanatory Labels
   const currentSpecLabel = createLabelSprite('Current Spectrogram', 0, 1.5, depth / 2 + 10, 256, 32);
   currentScene.add(currentSpecLabel);
-  labelSprites.push(currentSpecLabel);
+  perimeterLabelSprites.push(currentSpecLabel);
 
   const maxSpecLabel = createLabelSprite('Max Spectrogram (Peak Hold)', 0, 1.5, -depth / 2 - 10, 256, 32);
   currentScene.add(maxSpecLabel);
-  labelSprites.push(maxSpecLabel);
+  perimeterLabelSprites.push(maxSpecLabel);
 
   const zSpecLabel = createLabelSprite('Max Amplitude', -width / 2 - 14, 1.5, 0, 256, 32);
   currentScene.add(zSpecLabel);
-  labelSprites.push(zSpecLabel);
+  perimeterLabelSprites.push(zSpecLabel);
 
   const zAverageSpecLabel = createLabelSprite('Average Amplitude', width / 2 + 14, 1.5, 0, 256, 32);
   currentScene.add(zAverageSpecLabel);
-  labelSprites.push(zAverageSpecLabel);
+  perimeterLabelSprites.push(zAverageSpecLabel);
 
   // Re-apply visibility checks onto elements following recalculations
   syncVisualGuides();
@@ -146,13 +158,10 @@ export function initUI(scene, config, lineGroups = {}) {
   const timeLabel = document.getElementById('timeLabel');
   const wireframeToggle = document.getElementById('wireframeToggle');
   const visualisationSelect = document.getElementById('visualisationSelect');
-  
-  // Allocate the new color scheme selection node
   const colorSchemeSelect = document.getElementById('colorSchemeSelect');
 
   sourceSelect.value = audioState.sourceType || 'mic';
 
-  // Synchronise initial dropdown selection states
   if (visualisationSelect) {
     if (audioState.disableAllLinesLabels) visualisationSelect.value = 'none';
     else if (audioState.axisLinesOnly) visualisationSelect.value = 'axis';
@@ -231,12 +240,10 @@ export function initUI(scene, config, lineGroups = {}) {
     audioState.showWireframe = e.target.checked;
   });
 
-  // Handle mode selections via the dropdown node element
   if (visualisationSelect) {
     visualisationSelect.addEventListener('change', (e) => {
       const mode = e.target.value;
 
-      // Reset all guide flag states to false initially
       audioState.showBlueprintLines = false;
       audioState.showTopLines = false;
       audioState.axisLinesOnly = false;
@@ -262,7 +269,6 @@ export function initUI(scene, config, lineGroups = {}) {
     });
   }
 
-  // Handle new palette selections via the color scheme dropdown node
   if (colorSchemeSelect) {
     colorSchemeSelect.addEventListener('change', (e) => {
       const choice = e.target.value;
@@ -276,6 +282,5 @@ export function initUI(scene, config, lineGroups = {}) {
     });
   }
 
-  // Set default state parameters during page initialisation
   syncVisualGuides();
 }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { vertexShader, solidFragmentShader, wireFragmentShader } from './shaders.js';
 import { audioState } from './audio.js';
-import { initUI } from './ui.js';
+import { initUI, setPerimeterLabelsVisible } from './ui.js';
 import { COLOUR_SCHEMES, applyColourScheme } from './colours.js';
 
 // 1. Initialise Scene and Viewport Engine
@@ -67,6 +67,9 @@ function updatePerimeterVisibility() {
   if (maxSideLine) maxSideLine.visible = showLines;
   if (avgSideLine) avgSideLine.visible = showLines;
   if (backLine) backLine.visible = showLines;
+
+  // Toggle 3D perimeter text labels
+  setPerimeterLabelsVisible(showLines);
 }
 
 // 3. Reusable Visualiser Element Lifecycle Setup
