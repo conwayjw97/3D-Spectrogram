@@ -220,10 +220,8 @@ function setupVisualiserElements() {
 setupVisualiserElements();
 
 // 4. Draw Fixed Blueprint Structural Guides
-const axisLinesGroup = new THREE.Group();
 const boxLinesGroup = new THREE.Group();
 const topLinesGroup = new THREE.Group();
-scene.add(axisLinesGroup);
 scene.add(boxLinesGroup);
 scene.add(topLinesGroup);
 
@@ -232,11 +230,6 @@ function createAxisLine(start, end, targetGroup) {
   const line = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
   targetGroup.add(line);
 }
-
-// Minimal Primary Structural Axes
-createAxisLine([-width / 2, 0,  depth / 2], [ width / 2, 0,  depth / 2], axisLinesGroup);
-createAxisLine([-width / 2, 0,  depth / 2], [-width / 2, 25,  depth / 2], axisLinesGroup);
-createAxisLine([-width / 2, 0, -depth / 2], [-width / 2, 0,  depth / 2], axisLinesGroup);
 
 // Outer Blueprint Framing Extensions
 createAxisLine([ width / 2, 0,  depth / 2], [ width / 2, 0, -depth / 2], boxLinesGroup);
@@ -255,7 +248,7 @@ createAxisLine([-width / 2, 25, -depth / 2], [-width / 2, 25,  depth / 2], topLi
 initUI(
   scene,
   { width, depth, freqSamples, timeSamples },
-  { axisLinesGroup, boxLinesGroup, topLinesGroup, perimeterLinesGroup }
+  { boxLinesGroup, topLinesGroup, perimeterLinesGroup }
 );
 
 const precisionSlider = document.getElementById('precisionSlider');
