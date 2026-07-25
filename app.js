@@ -15,7 +15,7 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-camera.position.set(45, 55, 95);
+camera.position.set(-45, 55, 95);
 camera.lookAt(0, 0, 0);
 
 // Hover Visualisation Raycasting Engine variables
