@@ -173,7 +173,7 @@ export function initUI(scene, config, lineGroups = {}) {
     if (audioState.disableAllLinesLabels) visualisationSelect.value = 'none';
     else if (audioState.axisLinesOnly) visualisationSelect.value = 'axis';
     else if (audioState.showBlueprintLines && audioState.showTopLines) visualisationSelect.value = 'ceiling';
-    else visualisationSelect.value = 'blueprint';
+    else visualisationSelect.value = 'ceiling';
   }
 
   if (colorSchemeSelect) {

@@ -23,12 +23,40 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const tooltip = document.getElementById('spectrogramTooltip');
 
-// Tracks normalised coordinates inside the viewport
+// State tracking for freezing hover guides
+let isHoverFrozen = false;
+let pointerDownPos = { x: 0, y: 0 };
+let pinnedPos = { x: 0, z: 0, pctX: 0, pctZ: 0 };
+
+// --- Mouse / Pointer Event Listeners ---
+window.addEventListener('pointerdown', (event) => {
+  pointerDownPos = { x: event.clientX, y: event.clientY };
+});
+
+window.addEventListener('pointerup', (event) => {
+  const dx = Math.abs(event.clientX - pointerDownPos.x);
+  const dy = Math.abs(event.clientY - pointerDownPos.y);
+
+  // Distinguish clicks (<5px move) from camera rotation/dragging
+  if (dx < 5 && dy < 5) {
+    if (isHoverFrozen) {
+      // Unfreeze on click
+      isHoverFrozen = false;
+      updateTooltip();
+    } else if (hoverIndicatorGroup && hoverIndicatorGroup.visible) {
+      // Lock onto current position on click
+      isHoverFrozen = true;
+      updateTooltip();
+    }
+  }
+});
+
 window.addEventListener('mousemove', (event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  if (tooltip) {
+  // Position HTML tooltip near mouse only when unfrozen
+  if (!isHoverFrozen && tooltip) {
     tooltip.style.left = (event.clientX + 16) + 'px';
     tooltip.style.top = (event.clientY + 16) + 'px';
   }
@@ -55,13 +83,41 @@ let frontLine, frontLineGeometry;
 let maxSideLine, maxSideLineGeometry, historyAmplitudes;
 let avgSideLine, avgSideLineGeometry, historyAvgAmplitudes;
 let backLine, backLineGeometry, peakSpectrum;
-let hoverIndicatorGroup, hoverLine, hoverDot;
+let hoverIndicatorGroup, hoverLine, hoverHorizontalLine, hoverDot;
+let hoverFreqSprite, hoverDbSpriteLeft, hoverDbSpriteRight;
 
 // Group to hold perimeter lines for central visibility management
 const perimeterLinesGroup = new THREE.Group();
 scene.add(perimeterLinesGroup);
 
 // 3. Reusable Visualiser Element Lifecycle Setup
+
+// --- Dynamic Sprite Helper Functions ---
+function createDynamicLabelSprite(customWidth = 128, customHeight = 32) {
+  const canvas = document.createElement('canvas');
+  canvas.width = customWidth;
+  canvas.height = customHeight;
+  const ctx = canvas.getContext('2d');
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(spriteMaterial);
+  sprite.scale.set(customWidth / 12.8, customHeight / 12.8, 1);
+  
+  return { sprite, canvas, ctx, texture };
+}
+
+function updateSpriteText(labelObj, text) {
+  const { ctx, canvas, texture } = labelObj;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = 'Bold 16px Arial';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  texture.needsUpdate = true;
+}
+
 function setupVisualiserElements() {
   perimeterLinesGroup.clear();
 
@@ -78,10 +134,15 @@ function setupVisualiserElements() {
   if (avgSideLine && avgSideLine.material) avgSideLine.material.dispose();
   if (backLine && backLine.material) backLine.material.dispose();
 
+  // Clean up existing hover elements and dynamic textures
   if (hoverIndicatorGroup) {
     scene.remove(hoverIndicatorGroup);
     if (hoverLine && hoverLine.material) hoverLine.material.dispose();
+    if (hoverHorizontalLine && hoverHorizontalLine.material) hoverHorizontalLine.material.dispose();
     if (hoverDot && hoverDot.material) hoverDot.material.dispose();
+    if (hoverFreqSprite) hoverFreqSprite.texture.dispose();
+    if (hoverDbSpriteLeft) hoverDbSpriteLeft.texture.dispose();
+    if (hoverDbSpriteRight) hoverDbSpriteRight.texture.dispose();
   }
 
   if (geometry) geometry.dispose();
@@ -91,6 +152,7 @@ function setupVisualiserElements() {
   if (avgSideLineGeometry) avgSideLineGeometry.dispose();
   if (backLineGeometry) backLineGeometry.dispose();
   if (hoverLine && hoverLine.geometry) hoverLine.geometry.dispose();
+  if (hoverHorizontalLine && hoverHorizontalLine.geometry) hoverHorizontalLine.geometry.dispose();
   if (hoverDot && hoverDot.geometry) hoverDot.geometry.dispose();
 
   writeIndex = 0;
@@ -132,7 +194,7 @@ function setupVisualiserElements() {
   solidMesh.material.uniforms.u_audioTexture.value = dataTexture;
   scene.add(solidMesh);
 
-  // Front Line
+  // Perimeter Lines
   frontLineGeometry = new THREE.BufferGeometry();
   const frontLinePositions = new Float32Array(freqSamples * 3);
   for (let i = 0; i < freqSamples; i++) {
@@ -144,7 +206,6 @@ function setupVisualiserElements() {
   frontLine = new THREE.Line(frontLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
   perimeterLinesGroup.add(frontLine);
 
-  // Max Side Line
   maxSideLineGeometry = new THREE.BufferGeometry();
   const maxSideLinePositions = new Float32Array(timeSamples * 3);
   historyAmplitudes = new Float32Array(timeSamples);
@@ -157,7 +218,6 @@ function setupVisualiserElements() {
   maxSideLine = new THREE.Line(maxSideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
   perimeterLinesGroup.add(maxSideLine);
 
-  // Avg Side Line
   avgSideLineGeometry = new THREE.BufferGeometry();
   const avgSideLinePositions = new Float32Array(timeSamples * 3);
   historyAvgAmplitudes = new Float32Array(timeSamples);
@@ -170,7 +230,6 @@ function setupVisualiserElements() {
   avgSideLine = new THREE.Line(avgSideLineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 }));
   perimeterLinesGroup.add(avgSideLine);
 
-  // Back Line
   backLineGeometry = new THREE.BufferGeometry();
   const backLinePositions = new Float32Array(freqSamples * 3);
   peakSpectrum = new Float32Array(freqSamples);
@@ -185,15 +244,13 @@ function setupVisualiserElements() {
 
   const wireOpacity = Math.max(0.03, 0.6 * (128 / freqSamples));
 
-  const wireUniforms = {
-    u_audioTexture: { value: dataTexture },
-    u_writeIndex: { value: 0.0 },
-    u_opacity: { value: wireOpacity },
-    u_timeSamples: { value: timeSamples }
-  };
-
   wireframeMesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
-    uniforms: wireUniforms,
+    uniforms: {
+      u_audioTexture: { value: dataTexture },
+      u_writeIndex: { value: 0.0 },
+      u_opacity: { value: wireOpacity },
+      u_timeSamples: { value: timeSamples }
+    },
     vertexShader, 
     fragmentShader: wireFragmentShader,
     wireframe: true, side: THREE.DoubleSide, transparent: true
@@ -202,14 +259,32 @@ function setupVisualiserElements() {
   wireframeMesh.visible = audioState.showWireframe;
   scene.add(wireframeMesh);
 
-  // Hover Guide Indicator (Vertical Line + Peak Marker Dot)
+  // --- Initialize Refactored Hover Indicators ---
   hoverIndicatorGroup = new THREE.Group();
-  const lineGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-  hoverLine = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false }));
+
+  // 1. Vertical Line (extends floor Y=0 to far ceiling Y=25)
+  const vertGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+  hoverLine = new THREE.Line(vertGeom, new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false }));
+
+  // 2. Horizontal Line (extends across X-axis between timeWindow sides)
+  const horizGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+  hoverHorizontalLine = new THREE.Line(horizGeom, new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false }));
+
+  // 3. Peak Dot
   hoverDot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }));
 
+  // 4. Dynamic Label Sprites at Touch Points
+  hoverFreqSprite = createDynamicLabelSprite(128, 32);
+  hoverDbSpriteLeft = createDynamicLabelSprite(128, 32);
+  hoverDbSpriteRight = createDynamicLabelSprite(128, 32);
+
   hoverIndicatorGroup.add(hoverLine);
+  hoverIndicatorGroup.add(hoverHorizontalLine);
   hoverIndicatorGroup.add(hoverDot);
+  hoverIndicatorGroup.add(hoverFreqSprite.sprite);
+  hoverIndicatorGroup.add(hoverDbSpriteLeft.sprite);
+  hoverIndicatorGroup.add(hoverDbSpriteRight.sprite);
+
   hoverIndicatorGroup.visible = false;
   hoverIndicatorGroup.renderOrder = 999;
   scene.add(hoverIndicatorGroup);
@@ -285,62 +360,110 @@ window.addEventListener('resize', () => {
 const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const intersectionPoint = new THREE.Vector3();
 
+// Optional helper to style indicator when pinned vs active
+function updateTooltipVisuals() {
+  if (isHoverFrozen) {
+    hoverDot.material.color.setHex(0xffcc00); // Yellow dot when frozen
+    if (tooltip && !tooltip.innerHTML.includes('📌 [PINNED]')) {
+      tooltip.innerHTML = `<div style="color: #ffcc00; font-weight: bold; margin-bottom: 2px;">📌 [PINNED]</div>` + tooltip.innerHTML;
+    }
+  } else {
+    hoverDot.material.color.setHex(0xffffff); // Standard white dot
+  }
+}
+
+// --- Dynamic Raycasting & Real-time Update Loop ---
 function updateTooltip() {
   if (!tooltip) return;
 
-  if (solidMesh && solidMesh.visible) {
-    raycaster.setFromCamera(mouse, camera);
+  let x, z, pctX, pctZ;
+  let isValid = false;
 
+  if (isHoverFrozen) {
+    // 1. Lock horizontal position to pinned coordinates
+    x = pinnedPos.x;
+    z = pinnedPos.z;
+    pctX = pinnedPos.pctX;
+    pctZ = pinnedPos.pctZ;
+    isValid = true;
+  } else if (solidMesh && solidMesh.visible) {
+    // 2. Otherwise raycast to track mouse position
+    raycaster.setFromCamera(mouse, camera);
     const hit = raycaster.ray.intersectPlane(floorPlane, intersectionPoint);
 
     if (hit && Math.abs(intersectionPoint.x) <= width / 2 && Math.abs(intersectionPoint.z) <= depth / 2) {
-      const x = intersectionPoint.x;
-      const z = intersectionPoint.z;
+      x = intersectionPoint.x;
+      z = intersectionPoint.z;
+      pctX = Math.max(0, Math.min(1, (x + width / 2) / width));
+      pctZ = Math.max(0, Math.min(1, (depth / 2 - z) / depth));
 
-      const pctX = (x + width / 2) / width;
-      const pctZ = (depth / 2 - z) / depth;
-
-      const clampedPctX = Math.max(0, Math.min(1, pctX));
-      const clampedPctZ = Math.max(0, Math.min(1, pctZ));
-
-      const freqIndex = Math.floor(clampedPctX * (freqSamples - 1));
-      const timeIndex = Math.floor(clampedPctZ * (timeSamples - 1));
-      const dataIndex = (timeIndex * freqSamples + freqIndex) * 4;
-
-      const byteValue = audioData ? audioData[dataIndex] : 0;
-      const peakY = (byteValue / 255.0) * 25.0;
-
-      const linePositions = hoverLine.geometry.attributes.position.array;
-      linePositions[0] = x; linePositions[1] = 0;     linePositions[2] = z;
-      linePositions[3] = x; linePositions[4] = peakY; linePositions[5] = z;
-      hoverLine.geometry.attributes.position.needsUpdate = true;
-
-      hoverDot.position.set(x, peakY, z);
-      hoverIndicatorGroup.visible = true;
-
-      const minF = audioState.minFrequency || 0;
-      const maxF = audioState.targetFrequency || 10000;
-      const frequencyHz = minF + clampedPctX * (maxF - minF);
-      const timeOffsetSec = clampedPctZ * audioState.timeWindow;
-
-      const dbMin = audioState.analyser ? audioState.analyser.minDecibels : -100;
-      const dbMax = audioState.analyser ? audioState.analyser.maxDecibels : -30;
-      const currentDb = dbMin + (byteValue / 255.0) * (dbMax - dbMin);
-
-      const freqText = frequencyHz < 1000 ? `${Math.round(frequencyHz)} Hz` : `${(frequencyHz / 1000).toFixed(2)} kHz`;
-      const timeText = clampedPctZ < 0.01 ? "Now" : `-${timeOffsetSec.toFixed(2)}s`;
-      const dbText = `${Math.round(currentDb)} dB`;
-
-      tooltip.style.display = 'block';
-      tooltip.innerHTML = `
-        <strong>Freq:</strong> ${freqText}<br/>
-        <strong>Time:</strong> ${timeText}<br/>
-        <strong>Volume:</strong> ${dbText}
-      `;
-    } else {
-      tooltip.style.display = 'none';
-      hoverIndicatorGroup.visible = false;
+      // Save valid position in case user clicks to pin
+      pinnedPos = { x, z, pctX, pctZ };
+      isValid = true;
     }
+  }
+
+  if (isValid) {
+    // Read audio data at (X, Z) — CONTINUOUSLY RUNS IN REAL TIME EVEN WHEN PINNED
+    const freqIndex = Math.floor(pctX * (freqSamples - 1));
+    const timeIndex = Math.floor(pctZ * (timeSamples - 1));
+    const dataIndex = (timeIndex * freqSamples + freqIndex) * 4;
+
+    const byteValue = audioData ? audioData[dataIndex] : 0;
+    const peakY = (byteValue / 255.0) * 25.0;
+
+    // Update Vertical Line (X, Z stay fixed, Y spans floor to ceiling)
+    const vertPositions = hoverLine.geometry.attributes.position.array;
+    vertPositions[0] = x; vertPositions[1] = 0;  vertPositions[2] = z;
+    vertPositions[3] = x; vertPositions[4] = 25; vertPositions[5] = z;
+    hoverLine.geometry.attributes.position.needsUpdate = true;
+
+    // Update Horizontal Line (Spans X-axis at dynamic peakY height)
+    const horizPositions = hoverHorizontalLine.geometry.attributes.position.array;
+    horizPositions[0] = -width / 2; horizPositions[1] = peakY; horizPositions[2] = z;
+    horizPositions[3] =  width / 2; horizPositions[4] = peakY; horizPositions[5] = z;
+    hoverHorizontalLine.geometry.attributes.position.needsUpdate = true;
+
+    // Hover Dot position & color (Yellow when pinned, White when active)
+    hoverDot.position.set(x, peakY, z);
+    hoverDot.material.color.setHex(isHoverFrozen ? 0xffcc00 : 0xffffff);
+
+    // Audio Value Calculations
+    const minF = audioState.minFrequency || 0;
+    const maxF = audioState.targetFrequency || 10000;
+    const frequencyHz = minF + pctX * (maxF - minF);
+    const timeOffsetSec = pctZ * audioState.timeWindow;
+
+    const dbMin = audioState.analyser ? audioState.analyser.minDecibels : -100;
+    const dbMax = audioState.analyser ? audioState.analyser.maxDecibels : -30;
+    const currentDb = dbMin + (byteValue / 255.0) * (dbMax - dbMin);
+
+    const freqText = frequencyHz < 1000 ? `${Math.round(frequencyHz)} Hz` : `${(frequencyHz / 1000).toFixed(2)} kHz`;
+    const timeText = pctZ < 0.01 ? "Now" : `-${timeOffsetSec.toFixed(2)}s`;
+    const dbText = `${Math.round(currentDb)} dB`;
+
+    // Position & Render 3D Touch Point Sprites
+    hoverFreqSprite.sprite.position.set(x, 26, z);
+    updateSpriteText(hoverFreqSprite, freqText);
+
+    // Side dB labels dynamically move up/down with peakY
+    hoverDbSpriteLeft.sprite.position.set(-width / 2 - 5, peakY, z);
+    updateSpriteText(hoverDbSpriteLeft, dbText);
+
+    hoverDbSpriteRight.sprite.position.set(width / 2 + 5, peakY, z);
+    updateSpriteText(hoverDbSpriteRight, dbText);
+
+    hoverIndicatorGroup.visible = true;
+
+    // Update HTML Tooltip dynamically every frame
+    tooltip.style.display = 'block';
+    const pinnedHeader = isHoverFrozen ? `<div style="color: #ffcc00; font-weight: bold; margin-bottom: 2px;">📌 [PINNED]</div>` : '';
+    tooltip.innerHTML = `
+      ${pinnedHeader}
+      <strong>Freq:</strong> ${freqText}<br/>
+      <strong>Time:</strong> ${timeText}<br/>
+      <strong>Volume:</strong> ${dbText}
+    `;
   } else {
     tooltip.style.display = 'none';
     hoverIndicatorGroup.visible = false;

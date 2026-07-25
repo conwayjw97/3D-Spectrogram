@@ -9,7 +9,7 @@ export const audioState = {
   sourceType: 'mic',    
   activeStream: null,    
   showWireframe: true,
-  showTopLines: false,           
+  showTopLines: true,           
   showBlueprintLines: true,      
   axisLinesOnly: false,          
   disableAllLinesLabels: false,
