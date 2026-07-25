@@ -264,8 +264,14 @@ precisionSlider.addEventListener('input', (e) => {
 
 precisionSlider.addEventListener('change', (e) => {
   const val = parseInt(e.target.value);
-  timeSamples = val;
-  freqSamples = val;
+  
+  // Frequency samples can be as high as desired for horizontal precision
+  freqSamples = val; 
+  
+  // Time samples must be capped at 60 frames per second to match the render loop
+  const maxTimeSamples = Math.floor(audioState.timeWindow * 60);
+  timeSamples = Math.min(val, maxTimeSamples);
+  
   setupVisualiserElements();
 });
 
@@ -384,28 +390,26 @@ function animate() {
     frontLineGeometry.attributes.position.needsUpdate = true;
 
     const now = performance.now();
-    const delta = now - lastTime;
-    lastTime = now;
-    timeAccumulator += delta;
-
     const targetInterval = (audioState.timeWindow * 1000) / timeSamples;
-    let updatedThisFrame = false;
+        
+    // Use an 'if' statement instead of 'while' to prevent multiple writes per frame
+    if (now - lastTime >= targetInterval) {
+      // Increment by targetInterval to maintain consistent timing
+      lastTime += targetInterval;
+      
+      // Prevent the timer from falling infinitely behind if the browser tab is minimised
+      if (now - lastTime > 100) {
+        lastTime = now;
+      }
 
-    while (timeAccumulator >= targetInterval) {
-      timeAccumulator -= targetInterval;
-      updatedThisFrame = true;
-
-      // 1. Shift texture rows down by one row space
       const rowSize = freqSamples * 4;
       audioData.copyWithin(rowSize, 0, audioData.length - rowSize);
 
-      // 2. Shift perimeter history arrays down
       for (let i = timeSamples - 1; i > 0; i--) {
         historyAmplitudes[i] = historyAmplitudes[i - 1];
         historyAvgAmplitudes[i] = historyAvgAmplitudes[i - 1];
       }
 
-      // 3. Inject raw current frame data directly into Row 0
       for (let i = 0; i < freqSamples; i++) {
         const val = currentFrameData[i];
         const index = i * 4;
@@ -417,9 +421,7 @@ function animate() {
 
       historyAmplitudes[0] = (currentFramePeak / 255.0) * 25.0;
       historyAvgAmplitudes[0] = (currentFrameAvg / 255.0) * 25.0;
-    }
 
-    if (updatedThisFrame) {
       for (let j = 0; j < freqSamples; j++) {
         let maxBinVal = 0;
         for (let i = 0; i < timeSamples; i++) {
@@ -432,7 +434,6 @@ function animate() {
 
       solidMesh.material.uniforms.u_writeIndex.value = 0.0;
       wireframeMesh.material.uniforms.u_writeIndex.value = 0.0;
-
       dataTexture.needsUpdate = true;
     }
 
