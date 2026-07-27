@@ -13,7 +13,8 @@ export const audioState = {
   showBlueprintLines: true,      
   axisLinesOnly: false,          
   disableAllLinesLabels: false,
-  colorScheme: 0
+  colorScheme: 0,
+  frequencyScale: 'logarithmic'
 };
 
 export async function startAudio(onSuccess) {

@@ -4,7 +4,7 @@ import { audioState, startAudio, stopAudio } from './audio.js';
 let labelSprites = [];
 let perimeterLabelSprites = []; // Separate array for perimeter line labels
 let currentScene = null;
-let uiConfig = {};
+let uiConfig = { width: 100, depth: 100 };
 let runtimeLineGroups = {};
 
 function createLabelSprite(text, x, y, z, customWidth = 128, customHeight = 32) {
@@ -71,37 +71,53 @@ export function syncVisualGuides() {
 }
 
 export function generateAllAxisLabels() {
-  if (!currentScene || !audioState.analyser) return;
+  if (!currentScene) return;
 
-  labelSprites.forEach(obj => currentScene.remove(obj));
-  perimeterLabelSprites.forEach(obj => currentScene.remove(obj));
+  // Clear existing label sprites from scene
+  labelSprites.forEach(sprite => currentScene.remove(sprite));
   labelSprites = [];
-  perimeterLabelSprites = [];
 
-  const { width, depth } = uiConfig;
+  // Extract dimensions from module-scoped uiConfig
+  const width = uiConfig.width || 100;
+  const depth = uiConfig.depth || 100;
 
-  // 1. Frequency Labels (X-Axis)
-  const numXLabels = 10;
-  const freqSpan = (audioState.targetFrequency || 10000) - (audioState.minFrequency || 0);
+  // 1. Generate X-Axis Frequency Labels (Linear vs Logarithmic)
+  const numXLabels = 8;
+  const minF = audioState.frequencyScale === 'logarithmic' 
+    ? Math.max(20, audioState.minFrequency || 0) 
+    : (audioState.minFrequency || 0);
+  const maxF = audioState.targetFrequency || 10000;
+
   for (let i = 0; i < numXLabels; i++) {
-    const freq = (audioState.minFrequency || 0) + (i / (numXLabels - 1)) * freqSpan;
+    let freq;
+    const norm = i / (numXLabels - 1);
+
+    if (audioState.frequencyScale === 'logarithmic') {
+      freq = minF * Math.pow(maxF / minF, norm);
+    } else {
+      freq = minF + norm * (maxF - minF);
+    }
+
     const text = freq < 1000 ? `${Math.round(freq)} Hz` : `${(freq / 1000).toFixed(1)} kHz`;
-    const x = -width / 2 + (i / (numXLabels - 1)) * width;
-    
+    const x = -width / 2 + norm * width;
+
     const spriteFront = createLabelSprite(text, x, 1.5, depth / 2 + 5, 128, 32);
-    currentScene.add(spriteFront); 
+    currentScene.add(spriteFront);
     labelSprites.push(spriteFront);
 
     const spriteBack = createLabelSprite(text, x, 1.5, -depth / 2 - 5, 128, 32);
-    currentScene.add(spriteBack); 
+    currentScene.add(spriteBack);
     labelSprites.push(spriteBack);
   }
 
   // 2. Amplitude Labels (Y-Axis)
-  const dbRange = audioState.analyser.maxDecibels - audioState.analyser.minDecibels;
+  const minDb = audioState.analyser ? audioState.analyser.minDecibels : -100;
+  const maxDb = audioState.analyser ? audioState.analyser.maxDecibels : -30;
+  const dbRange = maxDb - minDb;
+
   for (let i = 0; i < 5; i++) {
     const fraction = i / 4;
-    const text = `${Math.round(audioState.analyser.minDecibels + fraction * dbRange)} dB`;
+    const text = `${Math.round(minDb + fraction * dbRange)} dB`;
     const y = fraction * 25; 
     
     const spriteLeftFront = createLabelSprite(text, -width / 2 - 8, y, depth / 2 + 1, 128, 32);
@@ -114,7 +130,7 @@ export function generateAllAxisLabels() {
   }
 
   // 3. Timeline Labels (Z-Axis)
-  const totalSeconds = audioState.timeWindow;
+  const totalSeconds = audioState.timeWindow || 5;
   for (let i = 0; i < 5; i++) {
     const fraction = i / 4;
     const text = fraction === 0 ? 'Now' : `-${(fraction * totalSeconds).toFixed(1)}s`;
@@ -166,6 +182,19 @@ export function initUI(scene, config, lineGroups = {}) {
   const wireframeToggle = document.getElementById('wireframeToggle');
   const visualisationSelect = document.getElementById('visualisationSelect');
   const colorSchemeSelect = document.getElementById('colorSchemeSelect');
+  const freqScaleSelect = document.getElementById('freqScaleSelect');
+
+  if (freqScaleSelect) {
+    // Sync the dropdown with the current default state on startup
+    freqScaleSelect.value = audioState.frequencyScale || 'logarithmic';
+
+    freqScaleSelect.addEventListener('change', (e) => {
+      audioState.frequencyScale = e.target.value;
+      
+      // Regenerate axis labels so the X-axis markings reflect the scale change
+      generateAllAxisLabels();
+    });
+  }
 
   sourceSelect.value = audioState.sourceType || 'mic';
 

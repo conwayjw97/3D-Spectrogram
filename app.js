@@ -394,8 +394,8 @@ function updateTooltip() {
     if (hit && Math.abs(intersectionPoint.x) <= width / 2 && Math.abs(intersectionPoint.z) <= depth / 2) {
       x = intersectionPoint.x;
       z = intersectionPoint.z;
-      pctX = Math.max(0, Math.min(1, (x + width / 2) / width));
-      pctZ = Math.max(0, Math.min(1, (depth / 2 - z) / depth));
+      pctX = (x + width / 2) / width;
+      pctZ = (depth / 2 - z) / depth;
 
       // Save valid position in case user clicks to pin
       pinnedPos = { x, z, pctX, pctZ };
@@ -404,49 +404,59 @@ function updateTooltip() {
   }
 
   if (isValid) {
-    // Read audio data at (X, Z) — CONTINUOUSLY RUNS IN REAL TIME EVEN WHEN PINNED
-    const freqIndex = Math.floor(pctX * (freqSamples - 1));
-    const timeIndex = Math.floor(pctZ * (timeSamples - 1));
+    // Compute clamped percentages universally for both pinned and unpinned states
+    const clampedPctX = Math.max(0, Math.min(1, pctX));
+    const clampedPctZ = Math.max(0, Math.min(1, pctZ));
+
+    // Read audio data at (X, Z)
+    const freqIndex = Math.floor(clampedPctX * (freqSamples - 1));
+    const timeIndex = Math.floor(clampedPctZ * (timeSamples - 1));
     const dataIndex = (timeIndex * freqSamples + freqIndex) * 4;
 
     const byteValue = audioData ? audioData[dataIndex] : 0;
     const peakY = (byteValue / 255.0) * 25.0;
 
-    // Update Vertical Line (X, Z stay fixed, Y spans floor to ceiling)
+    // Update Vertical Line
     const vertPositions = hoverLine.geometry.attributes.position.array;
     vertPositions[0] = x; vertPositions[1] = 0;  vertPositions[2] = z;
     vertPositions[3] = x; vertPositions[4] = 25; vertPositions[5] = z;
     hoverLine.geometry.attributes.position.needsUpdate = true;
 
-    // Update Horizontal Line (Spans X-axis at dynamic peakY height)
+    // Update Horizontal Line
     const horizPositions = hoverHorizontalLine.geometry.attributes.position.array;
     horizPositions[0] = -width / 2; horizPositions[1] = peakY; horizPositions[2] = z;
     horizPositions[3] =  width / 2; horizPositions[4] = peakY; horizPositions[5] = z;
     hoverHorizontalLine.geometry.attributes.position.needsUpdate = true;
 
-    // Hover Dot position & color (Yellow when pinned, White when active)
+    // Hover Dot position & colour
     hoverDot.position.set(x, peakY, z);
     hoverDot.material.color.setHex(isHoverFrozen ? 0xffcc00 : 0xffffff);
 
     // Audio Value Calculations
-    const minF = audioState.minFrequency || 0;
-    const maxF = audioState.targetFrequency || 10000;
-    const frequencyHz = minF + pctX * (maxF - minF);
-    const timeOffsetSec = pctZ * audioState.timeWindow;
+    let frequencyHz;
+    if (audioState.frequencyScale === 'logarithmic') {
+      const minF = Math.max(20, audioState.minFrequency || 0);
+      const maxF = audioState.targetFrequency || 10000;
+      frequencyHz = minF * Math.pow(maxF / minF, clampedPctX);
+    } else {
+      const minF = audioState.minFrequency || 0;
+      const maxF = audioState.targetFrequency || 10000;
+      frequencyHz = minF + clampedPctX * (maxF - minF);
+    }
+    const timeOffsetSec = clampedPctZ * audioState.timeWindow;
 
     const dbMin = audioState.analyser ? audioState.analyser.minDecibels : -100;
     const dbMax = audioState.analyser ? audioState.analyser.maxDecibels : -30;
     const currentDb = dbMin + (byteValue / 255.0) * (dbMax - dbMin);
 
     const freqText = frequencyHz < 1000 ? `${Math.round(frequencyHz)} Hz` : `${(frequencyHz / 1000).toFixed(2)} kHz`;
-    const timeText = pctZ < 0.01 ? "Now" : `-${timeOffsetSec.toFixed(2)}s`;
+    const timeText = clampedPctZ < 0.01 ? "Now" : `-${timeOffsetSec.toFixed(2)}s`;
     const dbText = `${Math.round(currentDb)} dB`;
 
     // Position & Render 3D Touch Point Sprites
     hoverFreqSprite.sprite.position.set(x, 26, z);
     updateSpriteText(hoverFreqSprite, freqText);
 
-    // Side dB labels dynamically move up/down with peakY
     hoverDbSpriteLeft.sprite.position.set(-width / 2 - 5, peakY, z);
     updateSpriteText(hoverDbSpriteLeft, dbText);
 
@@ -455,7 +465,7 @@ function updateTooltip() {
 
     hoverIndicatorGroup.visible = true;
 
-    // Update HTML Tooltip dynamically every frame
+    // Update HTML Tooltip dynamically
     tooltip.style.display = 'block';
     const pinnedHeader = isHoverFrozen ? `<div style="color: #ffcc00; font-weight: bold; margin-bottom: 2px;">📌 [PINNED]</div>` : '';
     tooltip.innerHTML = `
@@ -495,8 +505,25 @@ function animate() {
     let currentFrameSum = 0;
     const linePositions = frontLineGeometry.attributes.position.array;
 
+    const minF = audioState.frequencyScale === 'logarithmic' 
+      ? Math.max(20, audioState.minFrequency) 
+      : audioState.minFrequency;
+    const maxF = audioState.targetFrequency;
+
     for (let i = 0; i < freqSamples; i++) {
-      const continuousIndex = minIndex + (i / (freqSamples - 1)) * indexRange;
+      let continuousIndex;
+      const norm = i / (freqSamples - 1);
+
+      if (audioState.frequencyScale === 'logarithmic') {
+        // Exponential interpolation from minF to maxF
+        const freqHz = minF * Math.pow(maxF / minF, norm);
+        continuousIndex = (freqHz / audioState.context.sampleRate) * audioState.analyser.fftSize;
+      } else {
+        // Standard linear interpolation
+        const indexRange = Math.max(1, maxIndex - minIndex);
+        continuousIndex = minIndex + norm * indexRange;
+      }
+
       const indexLow = Math.floor(continuousIndex);
       const indexHigh = Math.min(indexLow + 1, audioState.dataArray.length - 1);
       const weight = continuousIndex - indexLow;
